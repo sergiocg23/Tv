@@ -1,0 +1,58 @@
+version: '3.8'
+services:
+  warp:
+    image: monius/docker-warp-socks:latest
+    container_name: warp-ace
+    privileged: true
+    expose:
+      - 9091
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 0
+      net.ipv4.conf.all.src_valid_mark: 1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "https://www.cloudflare.com/cdn-cgi/trace"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  acestream:
+    image: rotiemex/acewarp:latest
+    container_name: acestream6878
+    volumes:
+      - ./acestream.conf:/opt/acestream/acestream.conf
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+      - SYS_ADMIN
+    ports:
+      - "8621:8621"
+      - "6878:6878"
+    depends_on:
+      - warp
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx-playlist
+    volumes:
+      - ./playlist:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache
+      - ./jellyfin/media:/media
+    ports:
+      - "8096:8096"
+    depends_on:
+      - nginx
