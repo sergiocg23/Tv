@@ -61,6 +61,10 @@ services:
     volumes:
       - ./playlist:/usr/share/nginx/html:ro
     read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /var/log/nginx
     ports:
       - "8080:80"
     restart: unless-stopped
