@@ -14,18 +14,27 @@ services:
     expose:
       - 9091
     restart: unless-stopped
-    # privileged: true // probar a ver si va
+    # privileged: true # probar a ver si va
     cap_add:
       - NET_ADMIN
-      # - SYS_ADMIN // probar a ver si va
+      # - SYS_ADMIN # probar a ver si va
     sysctls:
       net.ipv6.conf.all.disable_ipv6: 1
       net.ipv4.conf.all.src_valid_mark: 1
     environment:
       - LOG_LEVEL=debug
     logging: *default-logging
+    network_mode: bridge
     healthcheck:
-      test: [ "CMD", "curl", "-sSf", "http://127.0.0.1:9091" ]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-sS",
+          "--socks5",
+          "127.0.0.1:9091",
+          "https://www.cloudflare.com/cdn-cgi/trace"
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -35,7 +44,7 @@ services:
     image: rotiemex/acewarp:latest
     container_name: acestream6878
     volumes:
-      - ./acestream.conf:/opt/acestream/acestream.conf
+      - ./config/acestream.conf:/opt/acestream/acestream.conf
     cap_add:
       - NET_RAW
       - NET_ADMIN
@@ -60,6 +69,7 @@ services:
     container_name: nginx-playlist
     volumes:
       - ./playlist:/usr/share/nginx/html:ro
+      - ./config/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     read_only: true
     tmpfs:
       - /var/cache/nginx
@@ -74,7 +84,7 @@ services:
       - X_FRAME_OPTIONS=sameorigin
     logging: *default-logging
     healthcheck:
-      test: [ "CMD", "curl", "-sSf", "http://localhost/" ]
+      test: [ "CMD", "curl", "-f", "http://127.0.0.1/healthz" ]
       interval: 30s
       timeout: 10s
       retries: 3
