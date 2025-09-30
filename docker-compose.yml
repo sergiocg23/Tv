@@ -11,8 +11,10 @@ services:
   warp:
     image: monius/docker-warp-socks:v5
     container_name: warp-ace
-    expose:
-      - 9091
+    # expose:
+    #   - 9091
+    ports:
+      - "9091:9091"
     restart: unless-stopped
     # privileged: true # probar a ver si va
     cap_add:
@@ -24,7 +26,9 @@ services:
     environment:
       - LOG_LEVEL=debug
     logging: *default-logging
-    network_mode: bridge
+    # network_mode: bridge
+    networks:
+      - tv
     healthcheck:
       test:
         [
@@ -39,6 +43,10 @@ services:
       timeout: 10s
       retries: 5
       start_period: 10s
+      # curl -x "socks5h://127.0.0.1:9091" -fsSL "https://www.cloudflare.com/cdn-cgi/trace"
+      # curl -x "http://127.0.0.1:9091" -fsSL "https://www.cloudflare.com/cdn-cgi/trace"
+    # Test: curl -I https://check.torproject.org/
+    # Test tor: curl --socks5 127.0.0.1:9091 https://check.torproject.org/
 
   acestream:
     image: rotiemex/acewarp:latest
@@ -57,6 +65,8 @@ services:
       - warp
     restart: unless-stopped
     logging: *default-logging
+    networks:
+      - tv
     healthcheck:
       test: [ "CMD", "curl", "-sSf", "http://localhost:8621" ]
       interval: 30s
@@ -108,19 +118,6 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-  zeronet:
-    image: canewsin/zeronet
-    container_name: zeronet
-    ports:
-      - "43110:43110"
-    volumes:
-      - ./zeronet_data:/root/data
-    restart: unless-stopped
-    environment:
-      - ENABLE_TOR=true
-      # https://ipfs.io/ipns/elcano.top
-    logging: *default-logging
-
 networks:
-  default:
+  tv:
     driver: bridge
