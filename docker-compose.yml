@@ -11,42 +11,28 @@ services:
   warp:
     image: monius/docker-warp-socks:v5
     container_name: warp-ace
-    # expose:
-    #   - 9091
-    ports:
-      - "9091:9091"
+    expose:
+      - 9091
     restart: unless-stopped
-    # privileged: true # probar a ver si va
-    cap_add:
-      - NET_ADMIN
-      # - SYS_ADMIN # probar a ver si va
     sysctls:
       net.ipv6.conf.all.disable_ipv6: 1
       net.ipv4.conf.all.src_valid_mark: 1
     environment:
       - LOG_LEVEL=debug
     logging: *default-logging
-    # network_mode: bridge
     networks:
       - tv
     healthcheck:
       test:
         [
-          "CMD",
-          "curl",
-          "-sS",
-          "--socks5",
-          "127.0.0.1:9091",
-          "https://www.cloudflare.com/cdn-cgi/trace"
+          "CMD-SHELL",
+          "curl -sS --socks5 127.0.0.1:9091 https://www.cloudflare.com/cdn-cgi/trace | grep -q 'warp=on'"
         ]
+
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 10s
-      # curl -x "socks5h://127.0.0.1:9091" -fsSL "https://www.cloudflare.com/cdn-cgi/trace"
-      # curl -x "http://127.0.0.1:9091" -fsSL "https://www.cloudflare.com/cdn-cgi/trace"
-    # Test: curl -I https://check.torproject.org/
-    # Test tor: curl --socks5 127.0.0.1:9091 https://check.torproject.org/
 
   acestream:
     image: rotiemex/acewarp:latest
