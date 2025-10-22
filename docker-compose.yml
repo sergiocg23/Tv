@@ -70,6 +70,8 @@ services:
     container_name: nginx-playlist
     volumes:
       - ./playlist:/usr/share/nginx/html:ro
+      - nginx-certs:/tmp/certs
+      # - ./config/nginx/certs:/tmp/certs:rw
     read_only: true
     tmpfs:
       - /var/cache/nginx
@@ -93,7 +95,7 @@ services:
     networks:
       - tv_net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1/healthz"]
+      test: ["CMD", "/usr/local/bin/nginx-health.sh"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -111,6 +113,8 @@ services:
       - ./jellyfin/config:/config
       - ./jellyfin/cache:/cache
       - ./jellyfin/media:/media
+      # - nginx-certs:/certs:ro
+      - ./playlist:/playlist:ro
     ports:
       - "8096:8096"
     depends_on:
@@ -119,6 +123,27 @@ services:
     logging: *default-logging
     networks:
       - tv_net
+
+  autoheal:
+    container_name: autoheal
+    image: willfarrell/autoheal:latest
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    networks:
+      - tv_net
+    logging: *default-logging
+
+volumes:
+  nginx-certs:
+    name: nginx-certs 
 
 networks:
   stream_net:

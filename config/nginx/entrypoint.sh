@@ -7,7 +7,7 @@ if [ ! -f /tmp/certs/privkey.pem ]; then
     -newkey rsa:2048 \
     -keyout /tmp/certs/privkey.pem \
     -out /tmp/certs/fullchain.pem \
-    -subj "/C=ES/ST=Spain/L=City/O=Tv/CN=localhost" \
+    -subj "/CN=nginx" \
     >/dev/null 2>&1
 fi
 
