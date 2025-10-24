@@ -43,16 +43,12 @@ services:
     container_name: acestream6878
     volumes:
       - ./config/acestream.conf:/opt/acestream/acestream.conf
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
     cap_add:
       - NET_RAW
       - NET_ADMIN
       - SYS_ADMIN
     ports:
-      - "127.0.0.1:8621:8621"
+      - "8621:8621"
       - "6878:6878"
       - "6879:6879"
     depends_on:
@@ -68,6 +64,44 @@ services:
       retries: 3
       start_period: 10s
 
+  nginx:
+    build: ./config/nginx
+    image: nginx-playlist:latest
+    container_name: nginx-playlist
+    volumes:
+      - ./playlist:/usr/share/nginx/html:ro
+      - nginx-certs:/tmp/certs
+      # - ./config/nginx/certs:/tmp/certs:rw
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/cache/nginx/client_temp
+      - /var/run
+      - /var/log/nginx
+      - /tmp
+    ports:
+      - "8080:443"
+      - "8081:80"
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    networks:
+      - tv_net
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/nginx-health.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    entrypoint: ["/docker-custom-entrypoint.sh"]
+
   jellyfin:
     image: jellyfin/jellyfin:10.10.6
     container_name: jellyfin
@@ -79,11 +113,12 @@ services:
       - ./jellyfin/config:/config
       - ./jellyfin/cache:/cache
       - ./jellyfin/media:/media
+      # - nginx-certs:/certs:ro
       - ./playlist:/playlist:ro
     ports:
       - "8096:8096"
     depends_on:
-      - acestream
+      - nginx
     restart: unless-stopped
     logging: *default-logging
     networks:
@@ -105,6 +140,10 @@ services:
     networks:
       - tv_net
     logging: *default-logging
+
+volumes:
+  nginx-certs:
+    name: nginx-certs 
 
 networks:
   stream_net:
