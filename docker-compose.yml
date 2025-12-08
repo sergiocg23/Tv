@@ -45,16 +45,18 @@ services:
       - ./config/acestream.conf:/opt/acestream/acestream.conf
     security_opt:
       - no-new-privileges:true
-    cap_drop:
-      - ALL
     cap_add:
       - NET_RAW
       - NET_ADMIN
       - SYS_ADMIN
     ports:
-      - "127.0.0.1:8621:8621"
-      - "6878:6878"
-      - "6879:6879"
+      # - "8621:8621"
+      # - "6878:6878"
+      # - "6879:6879"
+      - "127.0.0.1:8621:8621"  # Solo localhost - estadísticas
+      - "6878:6878"             # Público - streaming (necesario para Jellyfin)
+      - "127.0.0.1:6879:6879"  # Solo localhost - WebUI
+    
     depends_on:
       - warp
     restart: unless-stopped
