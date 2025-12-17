@@ -1,5 +1,4 @@
 jellyfin/
 data/
-TODO.md
 *.pem
 .env
