@@ -1,0 +1,9 @@
+# Override específico para Intel/AMD (Beelink S12 Pro - Intel N100)
+# Usar con: docker-compose -f docker-compose.yml -f docker-compose-intel-ext.yml up -d
+
+version: "3.8"
+
+services:
+  jellyfin:
+    devices:
+      - /dev/dri:/dev/dri  # GPU Intel/AMD para VA-API/QSV
