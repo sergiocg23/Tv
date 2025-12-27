@@ -1,4 +1,4 @@
-version: "3.8"
+# Docker Compose file for WARP SOCKS5, Ace Stream, Jellyfin, and Autoheal
 
 x-logging: &default-logging
   driver: "json-file"
@@ -8,7 +8,7 @@ x-logging: &default-logging
 
 services:
   warp:
-    image: monius/docker-warp-socks:v5
+    image: monius/docker-warp-socks:v4 # Usa la v4 porque en la v5 hay un bug
     container_name: warp-ace
     expose:
       - 9091
@@ -65,25 +65,15 @@ services:
       retries: 3
       start_period: 10s
 
-  jellyfin-init:
-    image: alpine:latest
-    container_name: jellyfin-init
-    command: sh /scripts/jellyfin-init.sh
-    volumes:
-      - ./config/jellyfin/jellyfin-init.sh:/scripts/jellyfin-init.sh:ro
-      - ./jellyfin:/jellyfin
-    logging: *default-logging
-    networks:
-      - tv_net
-
   jellyfin:
     image: jellyfin/jellyfin:10.10.6
     container_name: jellyfin
-    user: "1000:1000"
+    entrypoint: ["/bin/bash", "/scripts/entrypoint.sh"]
     environment:
       - TZ=Europe/Madrid
       # - JELLYFIN_PublishedServerUrl=http://192.168.1.138:8096  # Descomentar cuando uses Tailscale y cambiar a tu IP de Tailscale
     volumes:
+      - ./config/jellyfin/entrypoint.sh:/scripts/entrypoint.sh:ro
       - ./jellyfin/config:/config
       - ./jellyfin/cache:/cache
       - ./jellyfin/media:/media:ro
@@ -93,8 +83,6 @@ services:
       - "8096:8096"
       - "7359:7359/udp"
     depends_on:
-      jellyfin-init:
-        condition: service_completed_successfully
       acestream:
         condition: service_started
     restart: unless-stopped

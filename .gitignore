@@ -1,4 +1,5 @@
 jellyfin/
+!config/jellyfin
 data/
 *.pem
 .env

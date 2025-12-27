@@ -3,7 +3,7 @@
 - **Nginx**: `http://localhost:8080/healthz` → `curl -f` debería devolver 200.
 - **Jellyfin**: `http://localhost:8096/` → acceso a interfaz web.
 - **AceStream**: `http://localhost:8621/` → interfaz web.
-- **Warp**: Healthcheck ya configurado en docker-compose.
+- **Warp**: Healthcheck ya configurado en docker compose.
 
 ---
 

@@ -1,7 +1,5 @@
 # Override específico para PC con NVIDIA
-# Usar con: docker-compose -f docker-compose.yml -f docker-compose-nvidia-ext.yml up -d
-
-version: "3.8"
+# Usar con: docker compose -f docker-compose.yml -f docker-compose-nvidia-ext.yml up -d
 
 services:
   jellyfin:

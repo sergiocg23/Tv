@@ -1,4 +1,4 @@
-version: "3.8"
+# Old version nginx + acestream + warp + jellyfin setup
 
 x-logging: &default-logging
   driver: "json-file"
