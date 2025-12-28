@@ -115,6 +115,43 @@ services:
       - tv_net
     logging: *default-logging
 
+  cron:
+    build:
+      context: ./config/cron
+      dockerfile: Dockerfile
+    container_name: cron
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Madrid
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./playlist:/app/playlist:ro
+      - ./logs:/app/logs
+      - ./config/cron/crontab:/etc/cron.d/tv-automation:ro
+      # Aquí montaremos los módulos Python cuando estén listos
+      # - ./src/iptvListManager:/app/iptvListManager:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    networks:
+      - tv_net
+      # - stream_net
+    logging: *default-logging
+    depends_on:
+      acestream:
+        condition: service_healthy
+      jellyfin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/cron-health.sh"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 networks:
   stream_net:
     name: stream_net

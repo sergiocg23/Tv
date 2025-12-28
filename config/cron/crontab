@@ -1,0 +1,28 @@
+# Contenedor Crontab
+# Formato: minuto hora día mes día_semana comando
+#
+# Variables de entorno necesarias para cron
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+PYTHONPATH=/app
+PYTHONUNBUFFERED=1
+
+# Redirigir toda la salida al log
+CRON_LOG=/var/log/cron/cron.log
+
+# =============================================================================
+# TAREAS PROGRAMADAS
+# =============================================================================
+
+#Ejemplo: # 0 * * * * echo "[$(date '+\%Y-\%m-\%d \%H:\%M:\%S')] Health check - Cron activo" >> $CRON_LOG 2>&1
+
+# =============================================================================
+# TAREAS DE MANTENIMIENTO
+# =============================================================================
+
+# Limpiar logs antiguos de más de 7 días (cada lunes a las 5:00 AM)
+0 5 * * 1 find /app/logs -name "*.log" -mtime +7 -delete >> $CRON_LOG 2>&1
+
+# Rotar el log de cron si supera 10MB con timestamp (diario a las 4:00 AM)
+0 4 * * * [ $(stat -c\%s /var/log/cron/cron.log 2>/dev/null) -gt 10485760 ] && mv /var/log/cron/cron.log /var/log/cron/cron.log.old.$(date +\%Y\%m\%d-\%H\%M\%S) && touch /var/log/cron/cron.log 2>&1
+
