@@ -21,9 +21,17 @@ if [ ! -f /var/log/cron/cron.log ]; then
 fi
 
 # Mostrar módulos Python disponibles
-#TODO: Actualizar cuando existan módulos específicos para cron
-echo "Módulos Python disponibles en /app:"
-ls -la /app/ 2>/dev/null || echo "  (ninguno todavía)"
+echo "Módulos Python disponibles:"
+if [ -d /app ]; then
+    for dir in /app/*/; do
+        if [ -f "$dir/__init__.py" ]; then
+            module_name=$(basename "$dir")
+            echo "  - $module_name"
+        fi
+    done
+else
+    echo "  (ninguno todavía)"
+fi
 echo ""
 
 # Verificar que existe el archivo crontab
@@ -40,6 +48,9 @@ echo ""
 # Registrar el crontab
 crontab /etc/cron.d/tv-automation
 echo "✓ Crontab registrado"
+
+# Ejecutar iptvListWatcher download al iniciar el contenedor
+cd /app && python -m iptvListWatcher download >> /app/logs/iptvListWatcher.log 2>&1 || true
 
 echo ""
 echo "=================================================="

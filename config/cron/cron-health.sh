@@ -1,6 +1,7 @@
 #!/bin/bash
 # Health check para el contenedor cron
 
+# PROCESO CRON
 # Verificar que el proceso cron está corriendo (usando pidof como fallback)
 if command -v pgrep > /dev/null 2>&1; then
     if ! pgrep -x cron > /dev/null 2>&1; then
@@ -29,7 +30,32 @@ if ! command -v python > /dev/null 2>&1; then
     exit 1
 fi
 
-#TODO: Añadir checks cuando existan módulos específicos para cron
 
+# MODULO IPTVLISTWATCHER
+# Verificar módulo iptvListWatcher
+if ! python -m iptvListWatcher --version > /dev/null 2>&1; then
+    echo "ERROR: Módulo iptvListWatcher no está instalado o no funciona" >&2
+    exit 1
+fi
+
+# Verificar directorios necesarios
+if [ ! -d /app/playlist ]; then
+    echo "ERROR: Directorio /app/playlist no existe" >&2
+    exit 1
+fi
+
+if [ ! -d /app/logs ]; then
+    echo "ERROR: Directorio /app/logs no existe" >&2
+    exit 1
+fi
+
+# Verificar que los directorios son escribibles
+if [ ! -w /app/playlist ] || [ ! -w /app/logs ]; then
+    echo "ERROR: No se puede escribir en directorios necesarios" >&2
+    exit 1
+fi
+
+
+#END CHECKS
 echo "OK: Cron health check passed"
 exit 0

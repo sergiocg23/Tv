@@ -1,8 +1,7 @@
 
+Añadir el componente que va antes de jelly (Descargas...) en ello. Validarlo. Esta escribiendo en los logs todo duplicado!!!
 
-Añadir componente python para reconvertir el fichero.
-
-Añadir el componente que va antes de jelly.
+Meter jelly.
 
 Cuando haga los test, meter un par de pruebas, uno ok siempre y otro of siempre (off 0006)
 

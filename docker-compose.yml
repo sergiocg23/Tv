@@ -117,19 +117,26 @@ services:
 
   cron:
     build:
-      context: ./config/cron
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: config/cron/Dockerfile
     container_name: cron
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - TZ=Europe/Madrid
       - PYTHONUNBUFFERED=1
+      # Variables iptvListWatcher
+      - HOST_IP=${HOST_IP}
+      - IPTV_LIST_URL=${IPTV_LIST_URL}
+      - IPTV_OUTPUT_DIR=${IPTV_OUTPUT_DIR}
+      - IPTV_FILENAME=${IPTV_FILENAME}
+      - IPTV_GENERIC_IP=${IPTV_GENERIC_IP}
+      - IPTV_DOWNLOAD_TIMEOUT=${IPTV_DOWNLOAD_TIMEOUT}
     volumes:
-      - ./playlist:/app/playlist:ro
+      - ./playlist:/app/playlist
       - ./logs:/app/logs
       - ./config/cron/crontab:/etc/cron.d/tv-automation:ro
-      # Aquí montaremos los módulos Python cuando estén listos
-      # - ./src/iptvListManager:/app/iptvListManager:ro
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -137,13 +144,10 @@ services:
     tmpfs:
       - /tmp
     networks:
-      - tv_net
-      # - stream_net
+      - stream_net
     logging: *default-logging
     depends_on:
-      acestream:
-        condition: service_healthy
-      jellyfin:
+      warp:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/usr/local/bin/cron-health.sh"]

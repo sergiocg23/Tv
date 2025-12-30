@@ -38,20 +38,26 @@ RUN mkdir -p /app/logs /app/playlist /app/scripts /var/log/cron && \
 # Directorio de trabajo
 WORKDIR /app
 
-# Copiar requirements (se creará después para los módulos)
-COPY requirements.txt .
+# Copiar requirements desde config/cron/
+COPY config/cron/requirements.txt .
+
+# Copiar módulo iptvListWatcher desde src/
+COPY --chown=cron-user:cron-user src/iptvListWatcher ./iptvListWatcher
+
+# Instalar dependencias y módulo
 RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -e ./iptvListWatcher && \
     rm -rf /root/.cache/pip
 
-# Copiar scripts de entrada y health check
-COPY entrypoint.sh /entrypoint.sh
-COPY cron-health.sh /usr/local/bin/cron-health.sh
+# Copiar scripts de entrada y health check desde config/cron/
+COPY config/cron/entrypoint.sh /entrypoint.sh
+COPY config/cron/cron-health.sh /usr/local/bin/cron-health.sh
 
 # Dar permisos de ejecución
 RUN chmod +x /entrypoint.sh /usr/local/bin/cron-health.sh
 
-# Copiar crontab
-COPY crontab /etc/cron.d/tv-automation
+# Copiar crontab desde config/cron/
+COPY config/cron/crontab /etc/cron.d/tv-automation
 RUN chmod 0644 /etc/cron.d/tv-automation && \
     chown root:root /etc/cron.d/tv-automation
 

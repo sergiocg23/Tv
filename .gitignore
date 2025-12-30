@@ -1,5 +1,66 @@
+# Jellyfin
 jellyfin/
 !config/jellyfin
+
+# Data
 data/
+
+# SSL
 *.pem
+
+# Environment
 .env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/*.log
+
+# Playlist - mantener estructura pero ignorar contenido descargado
+playlist/ListWatcher/*.m3u
+playlist/ListWatcher/olds/*.m3u
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Temporary
+*.tmp
+*.bak
+*.backup
