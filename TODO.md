@@ -1,10 +1,9 @@
 
-Añadir el componente que va antes de jelly (Descargas...) en ello. Validarlo. Esta escribiendo en los logs todo duplicado!!!
-
-Meter jelly.
+Meter modulo prueba.
 
 Cuando haga los test, meter un par de pruebas, uno ok siempre y otro of siempre (off 0006)
 
+Meter Dispatcharr.
 
 Añadir tailscale
 

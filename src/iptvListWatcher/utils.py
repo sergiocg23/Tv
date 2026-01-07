@@ -4,7 +4,6 @@ Utilidades comunes para el módulo iptvListWatcher
 
 import hashlib
 import logging
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
@@ -108,20 +107,18 @@ def setup_logging(level: int = logging.INFO, log_file: str = None) -> logging.Lo
     logger = logging.getLogger('iptvListWatcher')
     logger.setLevel(level)
     
-    # Limpiar handlers existentes
-    logger.handlers.clear()
+    # Evitar propagación al logger raíz
+    logger.propagate = False
+    
+    # Limpiar handlers existentes para evitar duplicados
+    if logger.handlers:
+        logger.handlers.clear()
     
     # Formato de log
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    
-    # Handler para consola
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setLevel(level)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
     
     # Handler para archivo si se especifica
     if log_file:
@@ -135,7 +132,18 @@ def setup_logging(level: int = logging.INFO, log_file: str = None) -> logging.Lo
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
         except Exception as e:
+            # Si falla el archivo, usar consola como fallback
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(level)
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
             logger.warning(f"No se pudo configurar archivo de log {log_file}: {e}")
+    else:
+        # Si no hay archivo de log, usar solo consola
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(level)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
     
     return logger
 
