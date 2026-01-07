@@ -50,8 +50,12 @@ crontab /etc/cron.d/tv-automation
 echo "✓ Crontab registrado"
 
 # Ejecutar iptvListWatcher download al iniciar el contenedor
+echo "Ejecutando iptvListWatcher download inicial..."
 cd /app && python -m iptvListWatcher download >> /app/logs/iptvListWatcher.log 2>&1 || true
 
+# Ejecutar iptvListValidator validate al iniciar el contenedor (si existe la lista)
+echo "Ejecutando iptvListValidator validate inicial..."
+cd /app && python -m iptvListValidator validate --force --max-links 10 >> /app/logs/iptvListValidator.log 2>&1 || true
 echo ""
 echo "=================================================="
 echo "Iniciando servicio cron..."

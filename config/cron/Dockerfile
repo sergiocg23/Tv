@@ -41,12 +41,14 @@ WORKDIR /app
 # Copiar requirements desde config/cron/
 COPY config/cron/requirements.txt .
 
-# Copiar módulo iptvListWatcher desde src/
+# Copiar módulos Python desde src/
 COPY --chown=cron-user:cron-user src/iptvListWatcher ./iptvListWatcher
+COPY --chown=cron-user:cron-user src/iptvListValidator ./iptvListValidator
 
-# Instalar dependencias y módulo
+# Instalar dependencias y módulos
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -e ./iptvListWatcher && \
+    pip install --no-cache-dir -e ./iptvListValidator && \
     rm -rf /root/.cache/pip
 
 # Copiar scripts de entrada y health check desde config/cron/

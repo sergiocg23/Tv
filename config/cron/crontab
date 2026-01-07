@@ -17,8 +17,14 @@ CRON_LOG=/var/log/cron/cron.log
 # iptvListWatcher - Descargar y verificar lista IPTV cada dia a las 05:00 y a las 14:00
 0 5,14 * * * cd /app && python -m iptvListWatcher download >> /app/logs/iptvListWatcher.log 2>&1
 
+# iptvListValidator - Validar enlaces IPTV cada dia a las 05:10 y a las 14:10 (10 minutos después del watcher)
+10 5,14 * * * cd /app && python -m iptvListValidator validate --force >> /app/logs/iptvListValidator.log 2>&1
+
 # iptvListWatcher - Limpiar backups antiguos (mantener últimos 5) cada semana, los miercoles a las 7:00 AM
 0 3 * * 3 cd /app && python -m iptvListWatcher clean --keep 5 >> /app/logs/iptvListWatcher.log 2>&1
+
+# iptvListValidator - Limpiar backups antiguos (mantener últimos 5 de cada tipo) cada semana, los miercoles a las 7:00 AM
+0 7 * * 3 cd /app && python -m iptvListValidator clean --keep 5 >> /app/logs/iptvListValidator.log 2>&1
 
 # =============================================================================
 # TAREAS DE MANTENIMIENTO

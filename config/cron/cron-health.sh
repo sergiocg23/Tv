@@ -38,6 +38,13 @@ if ! python -m iptvListWatcher --version > /dev/null 2>&1; then
     exit 1
 fi
 
+# MODULO IPTVLISTVALIDATOR
+# Verificar módulo iptvListValidator
+if ! python -m iptvListValidator --version > /dev/null 2>&1; then
+    echo "ERROR: Módulo iptvListValidator no está instalado o no funciona" >&2
+    exit 1
+fi
+
 # Verificar directorios necesarios
 if [ ! -d /app/playlist ]; then
     echo "ERROR: Directorio /app/playlist no existe" >&2

@@ -5,6 +5,9 @@
 requests>=2.31.0
 requests[socks]>=2.31.0  # Soporte para proxy SOCKS5 (WARP)
 
+# Módulo iptvListValidator
+# (Usa las mismas dependencias que iptvListWatcher)
+
 # Utilidades comunes (descomentar según necesidad)
 # urllib3>=2.0.0
 # python-dateutil>=2.8.0

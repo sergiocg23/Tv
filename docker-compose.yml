@@ -133,6 +133,12 @@ services:
       - IPTV_FILENAME=${IPTV_FILENAME}
       - IPTV_GENERIC_IP=${IPTV_GENERIC_IP}
       - IPTV_DOWNLOAD_TIMEOUT=${IPTV_DOWNLOAD_TIMEOUT}
+      # Variables iptvListValidator
+      - VALIDATOR_OUTPUT_DIR=${VALIDATOR_OUTPUT_DIR}
+      - VALIDATOR_TIMEOUT_CONNECT=${VALIDATOR_TIMEOUT_CONNECT}
+      - VALIDATOR_TIMEOUT_STREAM=${VALIDATOR_TIMEOUT_STREAM}
+      - VALIDATOR_STABILITY_TEST_DURATION=${VALIDATOR_STABILITY_TEST_DURATION}
+      - VALIDATOR_MIN_BITRATE=${VALIDATOR_MIN_BITRATE}
     volumes:
       - ./playlist:/app/playlist
       - ./logs:/app/logs
@@ -149,6 +155,8 @@ services:
     depends_on:
       warp:
         condition: service_healthy
+      acestream:
+        condition: service_started
     healthcheck:
       test: ["CMD", "/usr/local/bin/cron-health.sh"]
       interval: 60s
