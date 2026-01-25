@@ -6,7 +6,6 @@ import argparse
 import sys
 import logging
 from pathlib import Path
-from typing import Optional
 
 from iptvListValidator import __version__, __description__
 from iptvListValidator.validator import IPTVValidator
@@ -27,17 +26,15 @@ def create_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Ejemplos de uso:
-  # Validar enlaces y generar listas
+  # Validar todos los tiers (Premium/Good/Suspect/Fail)
   iptvListValidator validate
   
-  # Validar forzando procesamiento
-  iptvListValidator validate --force
+  # Validar solo streams de un tier específico
+  iptvListValidator validate --list premium
+  iptvListValidator validate --list good
   
   # Verificar estado de los archivos
   iptvListValidator check
-  
-  # Limpiar backups antiguos (mantener últimos 5)
-  iptvListValidator clean --keep 5
   
   # Ver información de la configuración actual
   iptvListValidator info
@@ -85,23 +82,19 @@ Ejemplos de uso:
     # Comando: validate
     validate_parser = subparsers.add_parser(
         "validate",
-        help="Validar enlaces IPTV y generar listas",
-        description="Valida todos los enlaces, mide calidad y genera archivos separados de válidos/inválidos"
+        help="Validar enlaces IPTV con sistema de confianza",
+        description="Valida enlaces usando el sistema de puntuación por tiers (Premium/Good/Suspect/Fail) y genera archivos M3U clasificados. Por defecto valida todos los tiers."
     )
     validate_parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Forzar validación aunque no haya cambios en el archivo de entrada"
+        "--list",
+        type=str,
+        choices=['premium', 'good', 'suspect', 'fail'],
+        help="Validar solo streams de un tier específico. Si no se especifica, valida todos los tiers."
     )
     validate_parser.add_argument(
-        "--no-backup",
-        action="store_true",
-        help="No crear backup de los archivos anteriores"
-    )
-    validate_parser.add_argument(
-        "--max-links",
-        type=int,
-        help="Limitar número de enlaces a validar (útil para pruebas)"
+        "--url",
+        type=str,
+        help="Validar solo una URL específica directamente (modo prueba rápida)"
     )
     
     # Comando: check
@@ -109,24 +102,6 @@ Ejemplos de uso:
         "check",
         help="Verificar estado de los archivos",
         description="Muestra información de los archivos generados sin validar"
-    )
-    
-    # Comando: clean
-    clean_parser = subparsers.add_parser(
-        "clean",
-        help="Limpiar backups antiguos",
-        description="Elimina backups antiguos manteniendo solo los más recientes"
-    )
-    clean_parser.add_argument(
-        "--keep",
-        type=int,
-        default=5,
-        help="Número de backups a mantener de cada tipo (por defecto: 5)"
-    )
-    clean_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Simular limpieza sin borrar archivos"
     )
     
     # Comando: info
@@ -154,40 +129,84 @@ def cmd_validate(args: argparse.Namespace, config: Config, logger: logging.Logge
     try:
         validator = IPTVValidator(config, logger)
         
-        result = validator.validate_and_generate(
-            force=args.force,
-            create_backup=not args.no_backup,
-            max_links=args.max_links if hasattr(args, 'max_links') else None
-        )
+        # Si se especifica --url, validar solo esa URL
+        if hasattr(args, 'url') and args.url:
+            result = validator.validate_single_url(args.url)
+            
+            # Mostrar resultado
+            print("\n" + "=" * 70)
+            print("RESULTADO DE VALIDACIÓN DE URL")
+            print("=" * 70)
+            print(f"URL: {result['url']}")
+            print(f"Válido: {'✓ SÍ' if result['success'] else '✗ NO'}")
+            
+            if result['success']:
+                # Métricas básicas
+                print(f"Latencia: {result['latency']:.2f}s")
+                bitrate_bytes = result['bitrate']
+                bitrate_kb = bitrate_bytes / 1024
+                bitrate_mb = bitrate_bytes / (1024 * 1024)
+                print(f"Bitrate: {bitrate_bytes:.0f} B/s ({bitrate_kb:.1f} KB/s, {bitrate_mb:.2f} MB/s)")
+                print(f"Estable: {'✓ SÍ' if result['stable'] else '✗ NO'}")
+                
+                # Métricas avanzadas (si están disponibles)
+                if result.get('resolution'):
+                    print(f"Resolución: {result['resolution']}")
+                if result.get('fps') and result['fps'] > 0:
+                    print(f"FPS: {result['fps']:.1f}")
+                if result.get('video_codec'):
+                    print(f"Video Codec: {result['video_codec']}")
+                if result.get('audio_codec'):
+                    print(f"Audio Codec: {result['audio_codec']}")
+                if result.get('analysis_method'):
+                    print(f"Método de análisis: {result['analysis_method']}")
+                
+                print(f"Puntuación de calidad: {result['quality_score']:.1f}/100")
+            else:
+                print(f"Error: {result['error']}")
+            
+            print(f"Duración: {result['duration']:.2f}s")
+            print("=" * 70)
+            
+            return 0 if result['success'] else 1
         
-        if not result['success']:
-            logger.error(f"Error durante la validación: {result.get('error', 'Error desconocido')}")
-            return 1
+        # Sistema de confianza: validar por tier o todos los tiers
+        tiers_to_validate = [args.list] if hasattr(args, 'list') and args.list else ['premium', 'good', 'suspect', 'fail']
         
-        if not result.get('input_changed', False):
-            logger.info("No se requiere validación (sin cambios en el archivo de entrada)")
-            logger.info("Usa --force para forzar la validación")
-            return 0
+        logger.info(f"Validando tiers: {', '.join(tiers_to_validate)}")
         
-        # Mostrar resumen
+        all_stats = []
+        for tier in tiers_to_validate:
+            logger.info(f"Procesando tier: {tier}")
+            result = validator.validate_by_tier(tier=tier)
+            
+            if not result['success']:
+                logger.error(f"Error durante la validación del tier {tier}: {result.get('error', 'Error desconocido')}")
+                return 1
+            
+            all_stats.append((tier, result.get('statistics', {})))
+        
+        # Mostrar estadísticas consolidadas
         print("\n" + "=" * 70)
-        print("RESUMEN DE VALIDACIÓN")
+        print("ESTADÍSTICAS DE VALIDACIÓN POR TIERS")
         print("=" * 70)
-        print(f"Canales totales: {result['channels_total']}")
-        print(f"Canales con enlaces válidos: {result['channels_with_valid_links']}")
-        print(f"Canales sin enlaces válidos: {result['channels_all_failed']}")
-        print(f"Enlaces válidos: {result['links_valid']}/{result['links_total']}")
-        print(f"Enlaces fallidos: {result['links_failed']}/{result['links_total']}")
-        print("\nArchivos generados:")
-        print(f"  Válidos: {result['valid_file']}")
-        print(f"  Fallidos: {result['fail_file']}")
         
-        if result.get('backup_valid') or result.get('backup_fail'):
-            print("\nBackups creados:")
-            if result.get('backup_valid'):
-                print(f"  {result['backup_valid']}")
-            if result.get('backup_fail'):
-                print(f"  {result['backup_fail']}")
+        for tier, stats in all_stats:
+            print(f"\n[{tier.upper()}]")
+            print(f"  Streams validados: {stats.get('validated_count', 0)}")
+            print(f"  Éxitos: {stats.get('success_count', 0)}")
+            print(f"  Fallos: {stats.get('fail_count', 0)}")
+        
+        # Estadísticas globales (usar las últimas que son las más actualizadas)
+        if all_stats:
+            _, final_stats = all_stats[-1]
+            print("\n" + "-" * 70)
+            print("ESTADÍSTICAS GLOBALES")
+            print("-" * 70)
+            print(f"Total streams en sistema: {final_stats.get('total_streams', 0)}")
+            for tier, count in final_stats.get('by_tier', {}).items():
+                print(f"  - {tier.capitalize()}: {count}")
+            print(f"Confianza promedio: {final_stats.get('avg_confidence', 0):.1f}%")
         
         print("=" * 70)
         
@@ -244,18 +263,6 @@ def cmd_check(_args: argparse.Namespace, config: Config, logger: logging.Logger)
         else:
             print(f"  ❌ No existe: {fail_info['file']}")
         
-        # Contar backups
-        if config.olds_dir.exists():
-            valid_backups = list(config.olds_dir.glob(f"{valid_path.stem}_*"))
-            fail_backups = list(config.olds_dir.glob(f"{fail_path.stem}_*"))
-            
-            print("\nBackups disponibles:")
-            print(f"  Válidos: {len(valid_backups)}")
-            print(f"  Fallidos: {len(fail_backups)}")
-            print(f"  Directorio: {config.olds_dir}")
-        else:
-            print("\nNo hay directorio de backups")
-        
         print("=" * 70)
         
         return 0
@@ -265,47 +272,6 @@ def cmd_check(_args: argparse.Namespace, config: Config, logger: logging.Logger)
         return 1
 
 
-def cmd_clean(args: argparse.Namespace, config: Config, logger: logging.Logger) -> int:
-    """
-    Ejecuta el comando clean.
-    
-    Args:
-        args: Argumentos parseados
-        config: Configuración
-        logger: Logger
-        
-    Returns:
-        Código de salida (0 = éxito, 1 = error)
-    """
-    try:
-        validator = IPTVValidator(config, logger)
-        
-        result = validator.clean_old_backups(
-            keep=args.keep,
-            dry_run=args.dry_run
-        )
-        
-        if not result['success']:
-            logger.error(f"Error durante la limpieza: {result.get('error', 'Error desconocido')}")
-            return 1
-        
-        print("\n" + "=" * 70)
-        if args.dry_run:
-            print("SIMULACIÓN DE LIMPIEZA (DRY-RUN)")
-        else:
-            print("LIMPIEZA DE BACKUPS")
-        print("=" * 70)
-        print(f"Backups mantenidos: {result['kept']}")
-        print(f"Backups eliminados: {result['deleted']}")
-        if result.get('message'):
-            print(f"\n{result['message']}")
-        print("=" * 70)
-        
-        return 0
-        
-    except Exception as e:
-        logger.exception(f"Error inesperado: {e}")
-        return 1
 
 
 def cmd_info(_args: argparse.Namespace, config: Config, logger: logging.Logger) -> int:
@@ -330,7 +296,7 @@ def cmd_info(_args: argparse.Namespace, config: Config, logger: logging.Logger) 
         print(f"  Directorio de salida: {config.output_dir}")
         print(f"  Archivo de válidos: {config.get_valid_output_path()}")
         print(f"  Archivo de fallidos: {config.get_fail_output_path()}")
-        print(f"  Directorio de backups: {config.olds_dir}")
+        print(f"  Archivo de confianza: {config.get_confidence_path()}")
         print("\nTimeouts:")
         print(f"  Conexión: {config.timeout_connect}s")
         print(f"  Stream: {config.timeout_stream}s")
@@ -388,8 +354,6 @@ def main() -> int:
             return cmd_validate(args, config, logger)
         elif args.command == "check":
             return cmd_check(args, config, logger)
-        elif args.command == "clean":
-            return cmd_clean(args, config, logger)
         elif args.command == "info":
             return cmd_info(args, config, logger)
         else:

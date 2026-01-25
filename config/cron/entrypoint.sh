@@ -10,6 +10,21 @@ echo "Python: $(python --version)"
 echo "Usuario: $(whoami)"
 echo ""
 
+# Verificar ffmpeg/ffprobe
+echo "Herramientas de análisis de video:"
+if command -v ffmpeg >/dev/null 2>&1; then
+    echo "  ✓ ffmpeg: $(ffmpeg -version 2>&1 | head -n1 | cut -d' ' -f3)"
+else
+    echo "  ✗ ffmpeg: No disponible"
+fi
+
+if command -v ffprobe >/dev/null 2>&1; then
+    echo "  ✓ ffprobe: $(ffprobe -version 2>&1 | head -n1 | cut -d' ' -f3)"
+else
+    echo "  ✗ ffprobe: No disponible"
+fi
+echo ""
+
 # Verificar permisos de directorios
 echo "Verificando permisos..."
 chown -R cron-user:cron-user /app/logs 2>/dev/null || true
@@ -34,6 +49,18 @@ else
 fi
 echo ""
 
+# Mostrar configuración del validador
+echo "Configuración iptvListValidator:"
+echo "  - VALIDATOR_ANALYSIS_METHOD: ${VALIDATOR_ANALYSIS_METHOD:-auto (por defecto)}"
+echo "  - VALIDATOR_FFMPEG_DURATION: ${VALIDATOR_FFMPEG_DURATION:-10 (por defecto)} segundos"
+echo "  - VALIDATOR_FFMPEG_TIMEOUT: ${VALIDATOR_FFMPEG_TIMEOUT:-30 (por defecto)} segundos"
+echo "  - VALIDATOR_HYBRID_ANALYSIS: ${VALIDATOR_HYBRID_ANALYSIS:-true (por defecto)}"
+echo "  - VALIDATOR_MAX_RETRIES: ${VALIDATOR_MAX_RETRIES:-3 (por defecto)} intentos"
+echo "  - VALIDATOR_RETRY_DELAY: ${VALIDATOR_RETRY_DELAY:-5 (por defecto)} segundos"
+echo "  - VALIDATOR_TIMEOUT_CONNECT: ${VALIDATOR_TIMEOUT_CONNECT:-90} segundos"
+echo "  - VALIDATOR_MIN_BITRATE: ${VALIDATOR_MIN_BITRATE:-300000} bytes/s"
+echo ""
+
 # Verificar que existe el archivo crontab
 if [ ! -f /etc/cron.d/tv-automation ]; then
     echo "✗ ERROR: No se encontró el archivo crontab en /etc/cron.d/tv-automation"
@@ -51,11 +78,14 @@ echo "✓ Crontab registrado"
 
 # Ejecutar iptvListWatcher download al iniciar el contenedor
 echo "Ejecutando iptvListWatcher download inicial..."
-cd /app && python -m iptvListWatcher download >> /app/logs/iptvListWatcher.log 2>&1 || true
+#TODO: ACTIVAR
+# cd /app && python -m iptvListWatcher download >> /app/logs/iptvListWatcher.log 2>&1 || true
 
 # Ejecutar iptvListValidator validate al iniciar el contenedor (si existe la lista)
+# Acestream ya está healthy gracias a depends_on: service_healthy en docker-compose
 echo "Ejecutando iptvListValidator validate inicial..."
-cd /app && python -m iptvListValidator validate --force --max-links 10 >> /app/logs/iptvListValidator.log 2>&1 || true
+# TODO: ACTIVAR
+# cd /app && python -m iptvListValidator validate --force >> /app/logs/iptvListValidator.log 2>&1 || true
 echo ""
 echo "=================================================="
 echo "Iniciando servicio cron..."

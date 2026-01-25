@@ -19,6 +19,7 @@ RUN apt-get update && \
         curl \
         ca-certificates \
         procps \
+        ffmpeg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* /var/tmp/*

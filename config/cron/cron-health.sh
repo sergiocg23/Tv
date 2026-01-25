@@ -1,68 +1,83 @@
 #!/bin/bash
 # Health check para el contenedor cron
 
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+
+# Función para log a stdout
+log_info() {
+    echo "[$TIMESTAMP] HEALTHCHECK ✓ $1"
+}
+
+# Función para log de error a stderr
+log_error() {
+    echo "[$TIMESTAMP] HEALTHCHECK ✗ ERROR: $1" >&2
+}
+
+# Inicio del healthcheck
+echo "[$TIMESTAMP] HEALTHCHECK Iniciando verificación..."
+
 # PROCESO CRON
-# Verificar que el proceso cron está corriendo (usando pidof como fallback)
-if command -v pgrep > /dev/null 2>&1; then
-    if ! pgrep -x cron > /dev/null 2>&1; then
-        echo "ERROR: Proceso cron no está corriendo" >&2
-        exit 1
-    fi
-elif command -v pidof > /dev/null 2>&1; then
-    if ! pidof cron > /dev/null 2>&1; then
-        echo "ERROR: Proceso cron no está corriendo" >&2
-        exit 1
-    fi
+# Verificar que el proceso cron está corriendo
+# Buscar por "cron" en la lista de procesos (cron -f corre como "cron")
+if ps aux | grep -v grep | grep -q "[c]ron"; then
+    log_info "Proceso cron corriendo"
 else
-    echo "ERROR: No se puede verificar el proceso cron" >&2
+    log_error "Proceso cron no está corriendo"
     exit 1
 fi
 
 # Verificar que el archivo de log existe y es escribible
 if [ ! -w /var/log/cron/cron.log ]; then
-    echo "ERROR: No se puede escribir en /var/log/cron/cron.log" >&2
+    log_error "No se puede escribir en /var/log/cron/cron.log"
     exit 1
 fi
+log_info "Log de cron escribible"
 
 # Verificar que Python está disponible
 if ! command -v python > /dev/null 2>&1; then
-    echo "ERROR: Python no está disponible" >&2
+    log_error "Python no está disponible"
     exit 1
 fi
+log_info "Python disponible"
 
 
 # MODULO IPTVLISTWATCHER
 # Verificar módulo iptvListWatcher
 if ! python -m iptvListWatcher --version > /dev/null 2>&1; then
-    echo "ERROR: Módulo iptvListWatcher no está instalado o no funciona" >&2
+    log_error "Módulo iptvListWatcher no está instalado o no funciona"
     exit 1
 fi
+log_info "Módulo iptvListWatcher OK"
 
 # MODULO IPTVLISTVALIDATOR
 # Verificar módulo iptvListValidator
 if ! python -m iptvListValidator --version > /dev/null 2>&1; then
-    echo "ERROR: Módulo iptvListValidator no está instalado o no funciona" >&2
+    log_error "Módulo iptvListValidator no está instalado o no funciona"
     exit 1
 fi
+log_info "Módulo iptvListValidator OK"
 
 # Verificar directorios necesarios
 if [ ! -d /app/playlist ]; then
-    echo "ERROR: Directorio /app/playlist no existe" >&2
+    log_error "Directorio /app/playlist no existe"
     exit 1
 fi
+log_info "Directorio /app/playlist existe"
 
 if [ ! -d /app/logs ]; then
-    echo "ERROR: Directorio /app/logs no existe" >&2
+    log_error "Directorio /app/logs no existe"
     exit 1
 fi
+log_info "Directorio /app/logs existe"
 
 # Verificar que los directorios son escribibles
 if [ ! -w /app/playlist ] || [ ! -w /app/logs ]; then
-    echo "ERROR: No se puede escribir en directorios necesarios" >&2
+    log_error "No se puede escribir en directorios necesarios"
     exit 1
 fi
+log_info "Directorios escribibles"
 
 
 #END CHECKS
-echo "OK: Cron health check passed"
+echo "[$TIMESTAMP] HEALTHCHECK ✅ OK: Todos los checks pasaron"
 exit 0

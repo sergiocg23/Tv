@@ -21,7 +21,7 @@ class M3UChannel:
         self,
         name: str,
         group: str = "",
-        logo: str = "",
+        tvg_logo: str = "",
         tvg_id: str = "",
         extinf_line: str = ""
     ):
@@ -31,13 +31,13 @@ class M3UChannel:
         Args:
             name: Nombre del canal
             group: Grupo al que pertenece (group-title)
-            logo: URL del logo (tvg-logo)
+            tvg_logo: URL del logo (tvg-logo)
             tvg_id: ID del canal (tvg-id)
             extinf_line: Línea EXTINF completa original
         """
         self.name = name
         self.group = group
-        self.logo = logo
+        self.tvg_logo = tvg_logo
         self.tvg_id = tvg_id
         self.extinf_line = extinf_line
         self.links: List[str] = []
@@ -61,7 +61,14 @@ class ValidationResult:
         latency: float = 0.0,
         bitrate: float = 0.0,
         stable: bool = False,
-        error: str = ""
+        error: str = "",
+        # Nuevas métricas de video
+        resolution: str = "",
+        fps: float = 0.0,
+        video_codec: str = "",
+        audio_codec: str = "",
+        # Metadata adicional
+        analysis_method: str = "basic"  # basic, ffprobe, ffmpeg
     ):
         """
         Inicializa un resultado de validación.
@@ -70,9 +77,14 @@ class ValidationResult:
             link: URL del enlace validado
             success: Si la validación fue exitosa
             latency: Latencia en segundos
-            bitrate: Bitrate en bytes/segundo
+            bitrate: Bitrate en bytes/segundo (o kbps si es de ffmpeg)
             stable: Si el stream es estable
             error: Mensaje de error si falló
+            resolution: Resolución del video (ej: "1920x1080")
+            fps: Frames por segundo
+            video_codec: Codec de video (ej: "h264", "hevc")
+            audio_codec: Codec de audio (ej: "aac", "ac3")
+            analysis_method: Método usado para el análisis
         """
         self.link = link
         self.success = success
@@ -80,11 +92,21 @@ class ValidationResult:
         self.bitrate = bitrate
         self.stable = stable
         self.error = error
+        
+        # Nuevas métricas
+        self.resolution = resolution
+        self.fps = fps
+        self.video_codec = video_codec
+        self.audio_codec = audio_codec
+        self.analysis_method = analysis_method
     
     def get_quality_score(self) -> float:
         """
         Calcula un score de calidad para ordenar.
         Mayor score = mejor calidad.
+        
+        Usa un sistema de 5 factores si hay datos de ffmpeg,
+        o 3 factores para el método básico.
         
         Returns:
             Score de calidad (0.0 - 100.0)
@@ -92,6 +114,14 @@ class ValidationResult:
         if not self.success:
             return 0.0
         
+        # Si tenemos análisis de video (ffprobe/ffmpeg), usar score de 5 factores
+        if self.analysis_method in ['ffprobe', 'ffmpeg'] and self.resolution:
+            return self._calculate_advanced_score()
+        else:
+            return self._calculate_basic_score()
+    
+    def _calculate_basic_score(self) -> float:
+        """Score básico (3 factores): estabilidad, latencia, bitrate"""
         score = 0.0
         
         # Estabilidad es lo más importante (40 puntos)
@@ -111,13 +141,103 @@ class ValidationResult:
         
         return score
     
+    def _calculate_advanced_score(self) -> float:
+        """
+        Score avanzado (5 factores) similar a StreamFlow:
+        - Bitrate: 40%
+        - Resolución: 35%
+        - FPS: 15%
+        - Codec: 10%
+        Total: 100 puntos
+        """
+        score = 0.0
+        
+        # 1. Bitrate (40 puntos)
+        # Convertir a kbps si está en bytes/s
+        if self.bitrate > 100000:  # Probablemente está en bytes/s
+            bitrate_kbps = (self.bitrate * 8) / 1000
+        else:
+            bitrate_kbps = self.bitrate
+        
+        # Normalizar a 8000 kbps (típico Full HD)
+        bitrate_normalized = min(bitrate_kbps / 8000, 1.0)
+        score += bitrate_normalized * 40.0
+        
+        # 2. Resolución (35 puntos)
+        resolution_score = self._get_resolution_score()
+        score += resolution_score * 35.0
+        
+        # 3. FPS (15 puntos)
+        if self.fps > 0:
+            fps_normalized = min(self.fps / 60, 1.0)  # Normalizar a 60 FPS
+            score += fps_normalized * 15.0
+        
+        # 4. Codec de video (10 puntos)
+        codec_score = self._get_codec_score()
+        score += codec_score * 10.0
+        
+        return round(score, 2)
+    
+    def _get_resolution_score(self) -> float:
+        """Calcula score de resolución (0.0 - 1.0)"""
+        if not self.resolution or 'x' not in self.resolution:
+            return 0.3  # Score por defecto
+        
+        try:
+            _, height = map(int, self.resolution.split('x'))
+            
+            if height >= 2160:      # 4K
+                return 1.0
+            elif height >= 1080:    # Full HD
+                return 1.0
+            elif height >= 720:     # HD
+                return 0.7
+            elif height >= 576:     # SD (PAL)
+                return 0.5
+            elif height >= 480:     # SD (NTSC)
+                return 0.4
+            else:
+                return 0.3
+        except (ValueError, AttributeError):
+            return 0.3
+    
+    def _get_codec_score(self) -> float:
+        """Calcula score de codec (0.0 - 1.0)"""
+        if not self.video_codec:
+            return 0.5  # Score neutro si no hay info
+        
+        codec_lower = self.video_codec.lower()
+        
+        # H.265/HEVC es el mejor (más eficiente)
+        if 'h265' in codec_lower or 'hevc' in codec_lower:
+            return 1.0
+        
+        # H.264/AVC es muy bueno
+        elif 'h264' in codec_lower or 'avc' in codec_lower:
+            return 0.8
+        
+        # Otros codecs (VP9, VP8, etc.)
+        elif codec_lower not in ['n/a', 'unknown', '']:
+            return 0.5
+        
+        else:
+            return 0.3
+    
     def __repr__(self) -> str:
         if self.success:
-            return (
-                f"ValidationResult(link='{self.link[:50]}...', "
-                f"latency={self.latency:.2f}s, bitrate={self.bitrate/1000:.1f}KB/s, "
-                f"stable={self.stable}, score={self.get_quality_score():.1f})"
-            )
+            if self.analysis_method in ['ffprobe', 'ffmpeg']:
+                return (
+                    f"ValidationResult(link='{self.link[:50]}...', "
+                    f"resolution={self.resolution}, fps={self.fps:.1f}, "
+                    f"codec={self.video_codec}, bitrate={self.bitrate:.0f}, "
+                    f"score={self.get_quality_score():.1f}, method={self.analysis_method})"
+                )
+            else:
+                return (
+                    f"ValidationResult(link='{self.link[:50]}...', "
+                    f"latency={self.latency:.2f}s, bitrate={self.bitrate/1000:.1f}KB/s, "
+                    f"stable={self.stable}, score={self.get_quality_score():.1f})"
+                )
         else:
             return f"ValidationResult(link='{self.link[:50]}...', FAILED: {self.error})"
 
@@ -195,11 +315,11 @@ def parse_m3u_file(file_path: Path) -> List[M3UChannel]:
                     channels.append(current_channel)
                 
                 # Parsear información del canal
-                name, group, logo, tvg_id = _parse_extinf_line(line)
+                name, group, tvg_logo, tvg_id = _parse_extinf_line(line)
                 current_channel = M3UChannel(
                     name=name,
                     group=group,
-                    logo=logo,
+                    tvg_logo=tvg_logo,
                     tvg_id=tvg_id,
                     extinf_line=line
                 )
@@ -224,11 +344,11 @@ def _parse_extinf_line(line: str) -> Tuple[str, str, str, str]:
         line: Línea EXTINF completa
         
     Returns:
-        Tupla (nombre, grupo, logo, tvg_id)
+        Tupla (nombre, grupo, tvg_logo, tvg_id)
     """
     name = ""
     group = ""
-    logo = ""
+    tvg_logo = ""
     tvg_id = ""
     
     # Extraer group-title
@@ -239,7 +359,7 @@ def _parse_extinf_line(line: str) -> Tuple[str, str, str, str]:
     # Extraer tvg-logo
     logo_match = re.search(r'tvg-logo="([^"]*)"', line)
     if logo_match:
-        logo = logo_match.group(1)
+        tvg_logo = logo_match.group(1)
     
     # Extraer tvg-id
     tvg_id_match = re.search(r'tvg-id="([^"]*)"', line)
@@ -250,7 +370,7 @@ def _parse_extinf_line(line: str) -> Tuple[str, str, str, str]:
     if ',' in line:
         name = line.split(',', 1)[-1].strip()
     
-    return name, group, logo, tvg_id
+    return name, group, tvg_logo, tvg_id
 
 
 # ============================================================================

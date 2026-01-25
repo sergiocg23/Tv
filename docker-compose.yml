@@ -139,6 +139,13 @@ services:
       - VALIDATOR_TIMEOUT_STREAM=${VALIDATOR_TIMEOUT_STREAM}
       - VALIDATOR_STABILITY_TEST_DURATION=${VALIDATOR_STABILITY_TEST_DURATION}
       - VALIDATOR_MIN_BITRATE=${VALIDATOR_MIN_BITRATE}
+      - VALIDATOR_ANALYSIS_METHOD=${VALIDATOR_ANALYSIS_METHOD:-auto}
+      - VALIDATOR_FFMPEG_DURATION=${VALIDATOR_FFMPEG_DURATION:-10}
+      - VALIDATOR_FFMPEG_TIMEOUT=${VALIDATOR_FFMPEG_TIMEOUT:-30}
+      - VALIDATOR_HYBRID_ANALYSIS=${VALIDATOR_HYBRID_ANALYSIS:-true}
+      - VALIDATOR_MAX_RETRIES=${VALIDATOR_MAX_RETRIES:-3}
+      - VALIDATOR_RETRY_DELAY=${VALIDATOR_RETRY_DELAY:-5}
+      - VALIDATOR_CONFIDENCE_FILE=${VALIDATOR_CONFIDENCE_FILE:-confidence.json}
     volumes:
       - ./playlist:/app/playlist
       - ./logs:/app/logs
@@ -156,13 +163,13 @@ services:
       warp:
         condition: service_healthy
       acestream:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "/usr/local/bin/cron-health.sh"]
       interval: 60s
-      timeout: 5s
+      timeout: 20s
       retries: 3
-      start_period: 15s
+      start_period: 60s
 
 networks:
   stream_net:

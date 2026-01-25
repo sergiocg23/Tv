@@ -15,10 +15,38 @@ CRON_LOG=/var/log/cron/cron.log
 # =============================================================================
 
 # iptvListWatcher - Descargar y verificar lista IPTV cada dia a las 05:00 y a las 14:00
-0 5,14 * * * cd /app && python -m iptvListWatcher download >> /app/logs/iptvListWatcher.log 2>&1
+# 0 5,14 * * * cd /app && python -m iptvListWatcher download >> /app/logs/iptvListWatcher.log 2>&1
 
-# iptvListValidator - Validar enlaces IPTV cada dia a las 05:10 y a las 14:10 (10 minutos después del watcher)
-10 5,14 * * * cd /app && python -m iptvListValidator validate --force >> /app/logs/iptvListValidator.log 2>&1
+# =============================================================================
+# SISTEMA DE VALIDACIÓN POR TIERS (CONFIANZA)
+# =============================================================================
+# Validaciones con diferentes frecuencias según confianza del stream
+# - Premium (≥70%): Cada 12h - Streams muy confiables
+# - Good (50-69%): Cada 6h - Streams confiables
+# - Suspect (30-49%): Cada 2h - Streams poco confiables
+# - Fail (<30%): Cada 4h - Streams con fallos frecuentes
+#
+# NOTA: Descomenta SOLO UNA de las siguientes opciones:
+
+# OPCIÓN 1: Validación por tier individual (recomendado para optimización)
+# Premium: Cada 12 horas (01:00 y 13:00) - Análisis exhaustivo
+# 0 1,13 * * * cd /app && python -m iptvListValidator validate --list premium >> /app/logs/validator-premium.log 2>&1
+
+# Good: Cada 6 horas (02:00, 08:00, 14:00, 20:00) - Análisis exhaustivo
+# 0 2,8,14,20 * * * cd /app && python -m iptvListValidator validate --list good >> /app/logs/validator-good.log 2>&1
+
+# Suspect: Cada 2 horas (en minuto 10) - Análisis básico rápido
+# 10 */2 * * * cd /app && python -m iptvListValidator validate --list suspect >> /app/logs/validator-suspect.log 2>&1
+
+# Fail: Cada 4 horas (03:00, 07:00, 11:00, 15:00, 19:00, 23:00) - Análisis básico rápido
+# 0 3,7,11,15,19,23 * * * cd /app && python -m iptvListValidator validate --list fail >> /app/logs/validator-fail.log 2>&1
+
+# OPCIÓN 2: Validación completa de todos los tiers (legacy, más lento)
+# 10 5 * * 3 cd /app && python -m iptvListValidator validate --force >> /app/logs/iptvListValidator.log 2>&1
+
+# =============================================================================
+# LIMPIEZA DE BACKUPS
+# =============================================================================
 
 # iptvListWatcher - Limpiar backups antiguos (mantener últimos 5) cada semana, los miercoles a las 7:00 AM
 0 3 * * 3 cd /app && python -m iptvListWatcher clean --keep 5 >> /app/logs/iptvListWatcher.log 2>&1

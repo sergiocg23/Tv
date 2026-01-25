@@ -41,6 +41,78 @@ class Config:
     valid_filename: str = "iptvListValidatorValid.m3u"
     fail_filename: str = "iptvListValidatorFail.m3u"
     
+    # ===== NUEVAS OPCIONES DE ANÁLISIS AVANZADO =====
+    
+    # Método de análisis: 'basic', 'auto', 'ffprobe', 'ffmpeg'
+    # - basic: Solo HTTP streaming (rápido, sin métricas de video)
+    # - auto: Intenta ffprobe, luego ffmpeg, fallback a basic
+    # - ffprobe: Solo metadatos (rápido, requiere ffprobe instalado)
+    # - ffmpeg: Análisis completo descargando video (lento, más preciso)
+    analysis_method: str = 'auto'
+    
+    # Duración del análisis con ffmpeg (segundos)
+    ffmpeg_analysis_duration: int = 10
+    
+    # Timeout para análisis con ffprobe/ffmpeg (segundos)
+    ffmpeg_timeout: int = 30
+    
+    # Combinar método básico + ffmpeg (más completo pero más lento)
+    # Si es True, primero hace test de conectividad, luego análisis con ffmpeg
+    hybrid_analysis: bool = True
+    
+    # Número de reintentos para HTTP 500 o Timeout
+    max_retries: int = 3
+    
+    # Delay entre reintentos (segundos)
+    retry_delay: int = 5
+    
+    # ===== CONFIGURACIONES POR TIER =====
+    
+    # Archivo JSON de confianza
+    confidence_file: str = "confidence.json"
+    
+    # Configuración por tier (nombre, max_retries, analysis_method, hybrid)
+    tier_configs: Optional[dict] = None
+    
+    def __post_init__(self):
+        """Inicializa configuraciones por defecto después de creación."""
+        if self.tier_configs is None:
+            self.tier_configs = {
+                'premium': {
+                    'max_retries': 5,
+                    'analysis_method': 'auto',
+                    'hybrid_analysis': True,
+                    'retry_delay': 5
+                },
+                'good': {
+                    'max_retries': 3,
+                    'analysis_method': 'auto',
+                    'hybrid_analysis': True,
+                    'retry_delay': 5
+                },
+                'suspect': {
+                    'max_retries': 2,
+                    'analysis_method': 'basic',
+                    'hybrid_analysis': False,
+                    'retry_delay': 3
+                },
+                'fail': {
+                    'max_retries': 2,
+                    'analysis_method': 'basic',
+                    'hybrid_analysis': False,
+                    'retry_delay': 3
+                }
+            }
+    
+    def get_tier_config(self, tier: str) -> dict:
+        """Obtiene la configuración para un tier específico."""
+        return self.tier_configs.get(tier, {
+            'max_retries': self.max_retries,
+            'analysis_method': self.analysis_method,
+            'hybrid_analysis': self.hybrid_analysis,
+            'retry_delay': self.retry_delay
+        })
+    
     @classmethod
     def from_env(cls, env_file: Optional[Path] = None) -> "Config":
         """
@@ -132,6 +204,59 @@ class Config:
                 f"VALIDATOR_MIN_BITRATE debe ser un número entero, recibido: {min_bitrate_str}"
             )
         
+        # ===== NUEVAS OPCIONES DE ANÁLISIS AVANZADO =====
+        
+        # Método de análisis
+        analysis_method = os.getenv("VALIDATOR_ANALYSIS_METHOD", "auto")
+        if analysis_method not in ['basic', 'auto', 'ffprobe', 'ffmpeg']:
+            raise ValueError(
+                f"VALIDATOR_ANALYSIS_METHOD debe ser 'basic', 'auto', 'ffprobe' o 'ffmpeg', "
+                f"recibido: {analysis_method}"
+            )
+        
+        # Duración del análisis con ffmpeg
+        ffmpeg_duration_str = os.getenv("VALIDATOR_FFMPEG_DURATION", "10")
+        try:
+            ffmpeg_analysis_duration = int(ffmpeg_duration_str)
+        except ValueError:
+            raise ValueError(
+                f"VALIDATOR_FFMPEG_DURATION debe ser un número entero, recibido: {ffmpeg_duration_str}"
+            )
+        
+        # Timeout para ffmpeg
+        ffmpeg_timeout_str = os.getenv("VALIDATOR_FFMPEG_TIMEOUT", "30")
+        try:
+            ffmpeg_timeout = int(ffmpeg_timeout_str)
+        except ValueError:
+            raise ValueError(
+                f"VALIDATOR_FFMPEG_TIMEOUT debe ser un número entero, recibido: {ffmpeg_timeout_str}"
+            )
+        
+        # Análisis híbrido (basic + ffmpeg)
+        hybrid_analysis_str = os.getenv("VALIDATOR_HYBRID_ANALYSIS", "true").lower()
+        hybrid_analysis = hybrid_analysis_str in ['true', '1', 'yes', 'on']
+        
+        # Número máximo de reintentos
+        max_retries_str = os.getenv("VALIDATOR_MAX_RETRIES", "3")
+        try:
+            max_retries = int(max_retries_str)
+        except ValueError:
+            raise ValueError(
+                f"VALIDATOR_MAX_RETRIES debe ser un número entero, recibido: {max_retries_str}"
+            )
+        
+        # Delay entre reintentos
+        retry_delay_str = os.getenv("VALIDATOR_RETRY_DELAY", "5")
+        try:
+            retry_delay = int(retry_delay_str)
+        except ValueError:
+            raise ValueError(
+                f"VALIDATOR_RETRY_DELAY debe ser un número entero, recibido: {retry_delay_str}"
+            )
+        
+        # Archivo de confianza
+        confidence_file = os.getenv("VALIDATOR_CONFIDENCE_FILE", "confidence.json")
+        
         return cls(
             host_ip=host_ip,
             input_dir=input_dir,
@@ -141,7 +266,14 @@ class Config:
             timeout_connect=timeout_connect,
             timeout_stream=timeout_stream,
             stability_test_duration=stability_test_duration,
-            min_bitrate=min_bitrate
+            min_bitrate=min_bitrate,
+            analysis_method=analysis_method,
+            ffmpeg_analysis_duration=ffmpeg_analysis_duration,
+            ffmpeg_timeout=ffmpeg_timeout,
+            hybrid_analysis=hybrid_analysis,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+            confidence_file=confidence_file
         )
     
     @staticmethod
@@ -179,6 +311,18 @@ class Config:
     def get_fail_output_path(self) -> Path:
         """Retorna la ruta completa del archivo de inválidos."""
         return self.output_dir / self.fail_filename
+    
+    def get_confidence_path(self) -> Path:
+        """Retorna la ruta completa del archivo de confianza."""
+        return self.output_dir / self.confidence_file
+    
+    def get_tier_output_path(self, tier: str) -> Path:
+        """Retorna la ruta del archivo M3U para un tier específico."""
+        return self.output_dir / f"iptvListValidator{tier.capitalize()}.m3u"
+    
+    def get_master_output_path(self) -> Path:
+        """Retorna la ruta del archivo M3U maestro."""
+        return self.output_dir / "iptvListValidatorMaster.m3u"
     
     def validate(self) -> None:
         """
@@ -219,7 +363,6 @@ class Config:
     def ensure_directories(self) -> None:
         """Crea los directorios necesarios si no existen."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.olds_dir.mkdir(parents=True, exist_ok=True)
     
     def to_dict(self) -> dict:
         """
