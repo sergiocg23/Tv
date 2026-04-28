@@ -22,7 +22,17 @@ Con Beelink:
 
 Añadir tailscale
 
+Fail2ban y watchdog para reiniciar sistema si se queda colgado
+
+Programacion:
+https://ciriaco.netlify.app/
+https://www.open-epg.com/app/index.php
+
+
+https://github.com/Asapuskis/multimedia
 https://github.com/acestack-org/acestack-docs/tree/main
+https://github.com/krinkuto11/acestream-orchestrator
+
 
 
 https://github.com/LaQuay/TDTChannels
@@ -31,3 +41,6 @@ https://github.com/Free-TV/IPTV/blob/master/lists/spain.md
 
 https://raw.githubusercontent.com/jmvilarinho/ace/main/listaPersonal.w3u
 
+
+https://ipfs.io/ipns/k2k4r8oqlcjxsritt5mczkcn4mmvcmymbqw7113fz2flkrerfwfps004/
+https://matrix.to/#/#Collective:matrix.org

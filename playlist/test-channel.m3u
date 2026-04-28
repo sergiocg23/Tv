@@ -1,0 +1,3 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="" tvg-name="Test Channel - Gol Ramos" tvg-logo="" group-title="Testing",Test Channel - Gol Ramos
+http://127.0.0.1:8765/

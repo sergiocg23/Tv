@@ -57,6 +57,21 @@ if ! python -m iptvListValidator --version > /dev/null 2>&1; then
 fi
 log_info "Módulo iptvListValidator OK"
 
+# MODULO STREAMM3UGENERATOR
+# Verificar módulo streamM3UGenerator
+if ! python -m streamM3UGenerator --version > /dev/null 2>&1; then
+    log_error "Módulo streamM3UGenerator no está instalado o no funciona"
+    exit 1
+fi
+log_info "Módulo streamM3UGenerator OK"
+
+# Verificar que el stream de prueba está corriendo
+if ! python -m streamM3UGenerator health > /dev/null 2>&1; then
+    log_error "Stream de prueba no está respondiendo"
+    exit 1
+fi
+log_info "Stream de prueba OK"
+
 # Verificar directorios necesarios
 if [ ! -d /app/playlist ]; then
     log_error "Directorio /app/playlist no existe"

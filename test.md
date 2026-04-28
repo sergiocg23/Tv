@@ -18,3 +18,28 @@ curl -x "http://warp:9091" -fsSL "https://www.cloudflare.com/cdn-cgi/trace"
 Los de tor no los uso en warp
 Test: curl -I https://check.torproject.org/
 Test tor: curl --socks5 127.0.0.1:9091 https://check.torproject.org/
+
+
+
+acestream y m3u
+Estas dos no sirven
+https://test-streams.mux.dev/
+https://ottverse.com/free-hls-m3u8-test-urls/
+
+✔️ Solución correcta para testear tu motor
+
+La única forma 100% fiable es:
+
+Coges un vídeo corto (10–30 s)
+
+Lo publicas tú mismo en Ace Stream
+
+Lo reproduces desde tu motor
+
+Así:
+
+sabes que el stream existe
+
+sabes que hay seed
+
+sabes que si falla, es tu motor

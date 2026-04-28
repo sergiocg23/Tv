@@ -45,11 +45,13 @@ COPY config/cron/requirements.txt .
 # Copiar módulos Python desde src/
 COPY --chown=cron-user:cron-user src/iptvListWatcher ./iptvListWatcher
 COPY --chown=cron-user:cron-user src/iptvListValidator ./iptvListValidator
+COPY --chown=cron-user:cron-user src/streamM3UGenerator ./streamM3UGenerator
 
 # Instalar dependencias y módulos
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -e ./iptvListWatcher && \
     pip install --no-cache-dir -e ./iptvListValidator && \
+    pip install --no-cache-dir -e ./streamM3UGenerator && \
     rm -rf /root/.cache/pip
 
 # Copiar scripts de entrada y health check desde config/cron/

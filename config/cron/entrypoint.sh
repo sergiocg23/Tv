@@ -49,6 +49,15 @@ else
 fi
 echo ""
 
+# Iniciar stream de prueba con streamM3UGenerator
+echo "Iniciando stream de prueba..."
+if python -m streamM3UGenerator start; then
+    echo "✓ Stream de prueba iniciado"
+else
+    echo "✗ ERROR: No se pudo iniciar el stream de prueba"
+fi
+echo ""
+
 # Mostrar configuración del validador
 echo "Configuración iptvListValidator:"
 echo "  - VALIDATOR_ANALYSIS_METHOD: ${VALIDATOR_ANALYSIS_METHOD:-auto (por defecto)}"
@@ -78,8 +87,8 @@ echo "✓ Crontab registrado"
 
 # Ejecutar iptvListWatcher download al iniciar el contenedor
 echo "Ejecutando iptvListWatcher download inicial..."
-#TODO: ACTIVAR
-# cd /app && python -m iptvListWatcher download >> /app/logs/iptvListWatcher.log 2>&1 || true
+#TODO: ACTIVAR, no va con el cambio del formato de la lista
+cd /app && python -m iptvListWatcher download >> /app/logs/iptvListWatcher.log 2>&1 || true
 
 # Ejecutar iptvListValidator validate al iniciar el contenedor (si existe la lista)
 # Acestream ya está healthy gracias a depends_on: service_healthy en docker-compose
