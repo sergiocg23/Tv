@@ -1,5 +1,5 @@
 # Override específico para PC con NVIDIA
-# Usar con: docker compose -f compose/docker-compose.tv.yml -f compose/docker-compose.tv.nvidia-ext.yml up -d
+# Usar con: docker compose --env-file .env -f compose/docker-compose.tv.yml -f compose/docker-compose.tv.nvidia-ext.yml up -d
 
 services:
   jellyfin:

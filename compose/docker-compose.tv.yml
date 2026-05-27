@@ -126,8 +126,6 @@ services:
       dockerfile: config/cron/Dockerfile
     container_name: cron
     restart: unless-stopped
-    env_file:
-      - ../.env
     environment:
       - TZ=Europe/Madrid
       - PYTHONUNBUFFERED=1

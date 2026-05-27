@@ -62,20 +62,58 @@ tv/
 └── .gitignore
 ```
 
+## Configuración
+
+1. Copiar la plantilla de variables:
+   ```bash
+   cp .env.example .env
+   ```
+2. Editar `.env` con los valores reales de tu entorno (IP, rutas, timeouts, etc.).
+3. El fichero `.env` **no se versiona** (está en `.gitignore`).
+
+> **Convención:** `.env` vive en la raíz del stack (junto a `compose/`, `config/`, `data/`).
+> Las variables se inyectan vía `--env-file .env` en el comando de Docker Compose,
+> y el compose file documenta explícitamente qué variables usa cada servicio con sus
+> valores por defecto (ej: `${VALIDATOR_ANALYSIS_METHOD:-auto}`).
+
 ## Arranque
 
+> **Importante:** Todos los comandos se ejecutan desde la **raíz del stack** y requieren
+> `--env-file .env` para que Docker Compose interpole las variables definidas en `.env`.
+
 ```bash
+
 # Desde la raíz del stack (tv/)
 cd stacks/tv  # o la ruta que corresponda
 
+
+# Hacer build
+docker compose --env-file .env -f compose/docker-compose.tv.yml -f compose/docker-compose.tv.nvidia-ext.yml build --parallel
+
 # Solo CPU
-docker compose -f compose/docker-compose.tv.yml up -d
+docker compose --env-file .env -f compose/docker-compose.tv.yml up -d
 
 # Con GPU Intel/AMD (Beelink S12 Pro - Intel N100)
-docker compose -f compose/docker-compose.tv.yml -f compose/docker-compose.tv.intel-ext.yml up -d
+docker compose --env-file .env -f compose/docker-compose.tv.yml -f compose/docker-compose.tv.intel-ext.yml up -d
 
 # Con GPU NVIDIA
-docker compose -f compose/docker-compose.tv.yml -f compose/docker-compose.tv.nvidia-ext.yml up -d
+docker compose --env-file .env -f compose/docker-compose.tv.yml -f compose/docker-compose.tv.nvidia-ext.yml up -d
+```
+
+### Otros comandos útiles
+
+```bash
+# Ver logs de un servicio
+docker compose --env-file .env -f compose/docker-compose.tv.yml logs -f cron
+
+# Rebuildar un servicio tras cambios de código
+docker compose --env-file .env -f compose/docker-compose.tv.yml up -d --build cron
+
+# Parar el stack
+docker compose --env-file .env -f compose/docker-compose.tv.yml down
+
+# Verificar variables dentro del contenedor
+docker exec cron env | grep -E 'IPTV_|HOST_IP|VALIDATOR_'
 ```
 
 ## Troubleshooting

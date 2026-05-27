@@ -1,5 +1,5 @@
 # Override específico para Intel/AMD (Beelink S12 Pro - Intel N100)
-# Usar con: docker compose -f compose/docker-compose.tv.yml -f compose/docker-compose.tv.intel-ext.yml up -d
+# Usar con: docker compose --env-file .env -f compose/docker-compose.tv.yml -f compose/docker-compose.tv.intel-ext.yml up -d
 
 services:
   jellyfin:
