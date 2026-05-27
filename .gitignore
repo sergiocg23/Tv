@@ -1,18 +1,30 @@
-# Jellyfin
-jellyfin/
-!config/jellyfin
+# ============================================================
+# Stack: tv — .gitignore
+# ============================================================
 
-# Data
+# --- Data runtime (NO versionable) ---
 data/
+!data/.gitkeep
+!data/**/.gitkeep
 
-# SSL
-*.pem
+# --- Jellyfin legacy (pendiente de migrar a data/) ---
+jellyfin/
+!config/jellyfin/
 
-# Environment
+# --- Playlist legacy (pendiente de migrar a data/) ---
+playlist/
+
+# --- Logs legacy (pendiente de migrar a data/) ---
+logs/
+
+# --- Environment ---
 .env
 !.env.example
 
-# Python
+# --- SSL ---
+*.pem
+
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
@@ -34,7 +46,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# IDE
+# --- IDE ---
 .vscode/
 .idea/
 *.swp
@@ -42,25 +54,22 @@ wheels/
 *~
 .DS_Store
 
-# Logs
+# --- Logs ---
 *.log
-logs/*.log
 
-# Playlist - mantener estructura pero ignorar contenido descargado
-playlist/ListWatcher/*.m3u
-playlist/ListWatcher/olds/*.m3u
-
-# Testing
+# --- Testing ---
 .pytest_cache/
 .coverage
 htmlcov/
 
-# OS
+# --- OS ---
 Thumbs.db
 .Spotlight-V100
 .Trashes
 
-# Temporary
+# --- Temporary ---
 *.tmp
 *.bak
 *.backup
+
+*.github/
