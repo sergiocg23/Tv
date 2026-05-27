@@ -5,10 +5,12 @@ Monitor y gestor de listas IPTV con detección automática de cambios.
 ## ¿Qué hace?
 
 1. **Descarga** una lista IPTV desde una URL configurable
-2. **Reemplaza** automáticamente `127.0.0.1` por la IP de tu host
-3. **Detecta cambios** comparando hash SHA256 del contenido
-4. **Crea backups** automáticos con timestamp cuando hay cambios
-5. **Limpia** archivos antiguos manteniendo solo los más recientes
+2. **Parsea** el M3U con formato estricto (`#EXTGRP`, `#EXTINF`) + fallback resiliente
+3. **Reemplaza** automáticamente `127.0.0.1` por la IP de tu host
+4. **Detecta cambios** comparando hash SHA256 del contenido
+5. **Crea backups** automáticos con timestamp cuando hay cambios
+6. **Limpia** archivos antiguos manteniendo solo los más recientes
+7. **Gestiona URLs** en runtime con override persistente y historial
 
 ## Instalación
 
@@ -123,6 +125,54 @@ iptvListWatcher hash /ruta/al/archivo.m3u
 
 ---
 
+### 🔗 set-url - Cambiar URL en runtime
+Establece una nueva URL de descarga sin reiniciar el contenedor.
+Se persiste en `url_config.json` dentro del directorio de salida.
+
+```bash
+# Cambiar URL
+iptvListWatcher set-url "https://nueva-fuente.com/lista.m3u"
+
+# Con motivo (queda en el historial)
+iptvListWatcher set-url "https://nueva-fuente.com/lista.m3u" --reason "la fuente anterior dejó de funcionar"
+```
+
+**Desde Docker:**
+```bash
+docker compose --env-file .env -f compose/docker-compose.tv.yml run --rm cron \
+  python3 -m iptvListWatcher set-url "https://nueva-fuente.com/lista.m3u" --reason "nueva fuente"
+```
+
+---
+
+### 📋 get-url - Ver URL activa e historial
+Muestra la URL de descarga en uso, su fuente y el historial de cambios.
+
+```bash
+iptvListWatcher get-url
+```
+
+**Muestra:**
+- URL actualmente en uso
+- Fuente (`env`, `override` o `cli`)
+- Si hay override activo
+- Historial completo de URLs con fechas y motivos
+
+---
+
+### 🔄 reset-url - Volver a la URL del .env
+Elimina el override y vuelve a usar `IPTV_LIST_URL` del `.env`.
+
+```bash
+# Reset simple
+iptvListWatcher reset-url
+
+# Con motivo
+iptvListWatcher reset-url --reason "la nueva fuente no funciona"
+```
+
+---
+
 ## Opciones Globales
 
 Se aplican a todos los comandos:
@@ -144,6 +194,37 @@ iptvListWatcher --version
 iptvListWatcher --help
 iptvListWatcher download --help
 ```
+
+## Jerarquía de Resolución de URL
+
+Cuando se ejecuta `download`, la URL se resuelve en este orden:
+
+1. **`--url` flag CLI** — máxima prioridad, no se persiste
+2. **`url_config.json` → `active_url`** — override persistente via `set-url`
+3. **`IPTV_LIST_URL` env var** — fallback por defecto desde `.env`
+
+El comando `info` muestra qué fuente se está usando.
+
+## Parser M3U
+
+El módulo incluye un parser de M3U en 2 niveles:
+
+### Modo estricto
+Parsea el formato esperado:
+```
+#EXTM3U url-tvg="..." refresh="..."
+#EXTVLCOPT:http-reconnect=true
+#EXTGRP: group-title="DEPORTES" group-logo="https://..."
+#EXTGRP: group-title="CINE"
+#EXTINF:-1 tvg-id="DAZN" tvg-logo="https://..." group-title="DEPORTES",DAZN 1 HD
+http://127.0.0.1:6878/ace/getstream?id=abc123
+```
+
+### Modo fallback
+Si el formato estricto falla o no encuentra canales, intenta rescatar el máximo:
+- Busca pares `#EXTINF` + URL
+- Busca URLs de Acestream sueltas (sin `#EXTINF`)
+- Canales sin grupo se asignan al grupo `OTROS`
 
 ## Ejemplos de Uso
 
@@ -180,24 +261,27 @@ iptvListWatcher -v download
 
 ```
 playlist/ListWatcher/
-├── iptv.m3u                    # Archivo actual
-└── olds/                       # Backups
-    ├── iptv_2025-12-28.m3u    # Backup del 28 de diciembre
-    ├── iptv_2025-12-27.m3u    # Backup del 27 de diciembre
-    └── iptv_2025-12-27_1.m3u  # Segundo backup del mismo día
+├── iptvWatcher.m3u              # Archivo actual
+├── url_config.json              # Override de URL + historial
+└── olds/                        # Backups
+    ├── iptvWatcher_2026-04-28.m3u
+    ├── iptvWatcher_2026-04-27.m3u
+    └── iptvWatcher_2026-04-27_1.m3u
 ```
 
 ## Funcionamiento Interno
 
 ### Detección de Cambios
-1. Descarga contenido desde URL
-2. Reemplaza `127.0.0.1` → `HOST_IP`
-3. Calcula hash SHA256 del nuevo contenido
-4. Compara con hash del archivo actual
-5. **Si son diferentes:**
+1. Descarga contenido desde URL (con jerarquía de resolución)
+2. Parsea M3U (estricto → fallback si falla)
+3. Reemplaza `127.0.0.1` → `HOST_IP` en las URLs parseadas
+4. Reconstruye el M3U desde los canales parseados
+5. Calcula hash SHA256 del nuevo contenido
+6. Compara con hash del archivo actual
+7. **Si son diferentes:**
    - Mueve archivo actual a `olds/` con timestamp
    - Guarda nuevo archivo
-6. **Si son iguales:**
+8. **Si son iguales:**
    - No hace nada (ahorra escrituras)
 
 ### Formato de Backups
@@ -222,10 +306,10 @@ Por defecto se guardan en `logs/iptvListWatcher.log`:
 
 ## Requisitos
 
-- Python >= 3.8
+- Python >= 3.12
 - requests >= 2.31.0
-- requests[socks]>=2.31.0
+- requests[socks] >= 2.31.0
 
 ## Versión
 
-1.0.0
+1.1.0

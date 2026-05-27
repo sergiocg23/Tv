@@ -1,17 +1,19 @@
 """
-CLI - Interfaz de línea de comandos para iptvListWatcher
+CLI - Interfaz de línea de comandos para iptvListWatcher.
 """
 
+from __future__ import annotations
+
 import argparse
-import sys
 import logging
+import sys
 from pathlib import Path
-from typing import Optional
 
 from iptvListWatcher import __version__, __description__
-from iptvListWatcher.watcher import IPTVWatcher
 from iptvListWatcher.config import Config
-from iptvListWatcher.utils import setup_logging, calculate_file_hash
+from iptvListWatcher.url_manager import UrlManager
+from iptvListWatcher.utils import calculate_file_hash, setup_logging
+from iptvListWatcher.watcher import IPTVWatcher
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -148,7 +150,51 @@ Ejemplos de uso:
         type=Path,
         help="Ruta al archivo M3U"
     )
-    
+
+    # Comando: set-url
+    set_url_parser = subparsers.add_parser(
+        "set-url",
+        help="Cambiar la URL de descarga en runtime",
+        description=(
+            "Establece una nueva URL de descarga IPTV que se usará en lugar "
+            "de la definida en IPTV_LIST_URL. Se persiste en url_config.json."
+        ),
+    )
+    set_url_parser.add_argument(
+        "new_url",
+        type=str,
+        help="Nueva URL de descarga IPTV",
+    )
+    set_url_parser.add_argument(
+        "--reason",
+        type=str,
+        default="",
+        help="Motivo del cambio (queda registrado en el historial)",
+    )
+
+    # Comando: get-url
+    subparsers.add_parser(
+        "get-url",
+        help="Ver la URL activa y el historial de cambios",
+        description="Muestra la URL de descarga activa y el historial de URLs.",
+    )
+
+    # Comando: reset-url
+    reset_url_parser = subparsers.add_parser(
+        "reset-url",
+        help="Eliminar el override y volver a usar la URL del .env",
+        description=(
+            "Elimina el override de URL y vuelve a usar la variable "
+            "de entorno IPTV_LIST_URL."
+        ),
+    )
+    reset_url_parser.add_argument(
+        "--reason",
+        type=str,
+        default="",
+        help="Motivo del reset (queda registrado en el historial)",
+    )
+
     return parser
 
 
@@ -156,26 +202,26 @@ def execute_download(args: argparse.Namespace, config: Config, logger: logging.L
     """Ejecuta el comando download."""
     try:
         watcher = IPTVWatcher(config, logger)
-        
+
         result = watcher.download_and_check(
             force=args.force,
-            create_backup=not args.no_backup
+            create_backup=not args.no_backup,
         )
-        
+
         if result["success"]:
             if result["changed"]:
-                logger.info(f"✓ Lista actualizada: {result['file_path']}")
+                logger.info("✓ Lista actualizada: %s", result["file_path"])
                 if result.get("backup_path"):
-                    logger.info(f"  Backup guardado: {result['backup_path']}")
+                    logger.info("  Backup guardado: %s", result["backup_path"])
             else:
                 logger.info("✓ No hay cambios en la lista")
             return 0
-        else:
-            logger.error(f"✗ Error: {result.get('error', 'Error desconocido')}")
-            return 1
-            
-    except Exception as e:
-        logger.exception(f"Error ejecutando download: {e}")
+
+        logger.error("✗ Error: %s", result.get("error", "Error desconocido"))
+        return 1
+
+    except Exception:
+        logger.exception("Error ejecutando download")
         return 1
 
 
@@ -184,23 +230,23 @@ def execute_check(args: argparse.Namespace, config: Config, logger: logging.Logg
     try:
         watcher = IPTVWatcher(config, logger)
         info = watcher.get_current_status()
-        
+
         logger.info("=== Estado actual ===")
-        logger.info(f"Archivo actual: {info['current_file']}")
-        logger.info(f"Existe: {info['exists']}")
-        
-        if info['exists']:
-            logger.info(f"Tamaño: {info['size_bytes']} bytes")
-            logger.info(f"Última modificación: {info['last_modified']}")
-            logger.info(f"Hash: {info['hash']}")
-            logger.info(f"Líneas: {info['lines']}")
-        
-        logger.info(f"Backups disponibles: {info['backup_count']}")
-        
+        logger.info("Archivo actual: %s", info["current_file"])
+        logger.info("Existe: %s", info["exists"])
+
+        if info["exists"]:
+            logger.info("Tamaño: %d bytes", info["size_bytes"])
+            logger.info("Última modificación: %s", info["last_modified"])
+            logger.info("Hash: %s", info["hash"])
+            logger.info("Líneas: %d", info["lines"])
+
+        logger.info("Backups disponibles: %d", info["backup_count"])
+
         return 0
-        
-    except Exception as e:
-        logger.exception(f"Error ejecutando check: {e}")
+
+    except Exception:
+        logger.exception("Error ejecutando check")
         return 1
 
 
@@ -208,30 +254,30 @@ def execute_clean(args: argparse.Namespace, config: Config, logger: logging.Logg
     """Ejecuta el comando clean."""
     try:
         watcher = IPTVWatcher(config, logger)
-        
+
         result = watcher.clean_old_files(
             keep=args.keep,
-            dry_run=args.dry_run
+            dry_run=args.dry_run,
         )
-        
+
         if args.dry_run:
             logger.info("=== Modo DRY RUN ===")
-        
-        logger.info(f"Archivos a eliminar: {result['deleted_count']}")
-        logger.info(f"Archivos mantenidos: {result['kept_count']}")
-        
-        if result['deleted_files']:
-            logger.info("\nArchivos eliminados:")
-            for file in result['deleted_files']:
-                logger.info(f"  - {file}")
-        
+
+        logger.info("Archivos a eliminar: %d", result["deleted_count"])
+        logger.info("Archivos mantenidos: %d", result["kept_count"])
+
+        if result["deleted_files"]:
+            logger.info("Archivos eliminados:")
+            for file in result["deleted_files"]:
+                logger.info("  - %s", file)
+
         if not args.dry_run:
-            logger.info("\n✓ Limpieza completada")
-        
+            logger.info("✓ Limpieza completada")
+
         return 0
-        
-    except Exception as e:
-        logger.exception(f"Error ejecutando clean: {e}")
+
+    except Exception:
+        logger.exception("Error ejecutando clean")
         return 1
 
 
@@ -239,90 +285,191 @@ def execute_info(args: argparse.Namespace, config: Config, logger: logging.Logge
     """Ejecuta el comando info."""
     try:
         logger.info("=== Configuración actual ===")
-        logger.info(f"URL de descarga: {config.list_url}")
-        logger.info(f"IP del host: {config.host_ip}")
-        logger.info(f"Directorio de salida: {config.output_dir}")
-        logger.info(f"Directorio de backups: {config.olds_dir}")
-        logger.info(f"Nombre del archivo: {config.filename}")
-        
+        logger.info("URL de descarga: %s", config.list_url)
+        logger.info("Fuente de URL: %s", config.url_source)
+        logger.info("IP del host: %s", config.host_ip)
+        logger.info("Directorio de salida: %s", config.output_dir)
+        logger.info("Directorio de backups: %s", config.olds_dir)
+        logger.info("Nombre del archivo: %s", config.filename)
+
         # Verificar directorios
-        logger.info("\n=== Estado de directorios ===")
-        logger.info(f"Output dir existe: {config.output_dir.exists()}")
-        logger.info(f"Olds dir existe: {config.olds_dir.exists()}")
-        
+        logger.info("=== Estado de directorios ===")
+        logger.info("Output dir existe: %s", config.output_dir.exists())
+        logger.info("Olds dir existe: %s", config.olds_dir.exists())
+
         # Estado actual
         watcher = IPTVWatcher(config, logger)
         status = watcher.get_current_status()
-        
-        logger.info("\n=== Estado actual ===")
-        logger.info(f"Archivo actual existe: {status['exists']}")
-        if status['exists']:
-            logger.info(f"Tamaño: {status['size_bytes']} bytes ({status['size_bytes'] / 1024:.2f} KB)")
-            logger.info(f"Líneas: {status['lines']}")
-        logger.info(f"Backups: {status['backup_count']}")
-        
+
+        logger.info("=== Estado actual ===")
+        logger.info("Archivo actual existe: %s", status["exists"])
+        if status["exists"]:
+            logger.info(
+                "Tamaño: %d bytes (%.2f KB)",
+                status["size_bytes"], status["size_bytes"] / 1024,
+            )
+            logger.info("Líneas: %d", status["lines"])
+        logger.info("Backups: %d", status["backup_count"])
+
         return 0
-        
-    except Exception as e:
-        logger.exception(f"Error ejecutando info: {e}")
+
+    except Exception:
+        logger.exception("Error ejecutando info")
         return 1
 
 
 def execute_hash(args: argparse.Namespace, config: Config, logger: logging.Logger) -> int:
     """Ejecuta el comando hash."""
     try:
-        file_path = args.file
-        
+        file_path: Path = args.file
+
         if not file_path.exists():
-            logger.error(f"El archivo no existe: {file_path}")
+            logger.error("El archivo no existe: %s", file_path)
             return 1
-        
+
         file_hash = calculate_file_hash(file_path)
-        logger.info(f"Hash SHA256 de {file_path.name}:")
+        logger.info("Hash SHA256 de %s:", file_path.name)
         logger.info(file_hash)
-        
+
         return 0
-        
-    except Exception as e:
-        logger.exception(f"Error calculando hash: {e}")
+
+    except Exception:
+        logger.exception("Error calculando hash")
         return 1
 
 
-def main(argv: Optional[list] = None) -> int:
+def execute_set_url(
+    args: argparse.Namespace, config: Config, logger: logging.Logger,
+) -> int:
+    """Ejecuta el comando set-url."""
+    try:
+        new_url: str = args.new_url
+
+        if not new_url.startswith(("http://", "https://")):
+            logger.error("La URL debe empezar con http:// o https://")
+            return 1
+
+        url_manager = config.get_url_manager()
+        url_config = url_manager.set_url(new_url, reason=args.reason)
+
+        logger.info("✓ URL override establecida")
+        logger.info("  Nueva URL: %s", url_config.active_url)
+        logger.info("  Actualizado: %s", url_config.updated_at)
+        logger.info("  Historial: %d entradas", len(url_config.history))
+        logger.info(
+            "  La próxima ejecución de 'download' usará esta URL."
+        )
+
+        return 0
+
+    except Exception:
+        logger.exception("Error ejecutando set-url")
+        return 1
+
+
+def execute_get_url(
+    args: argparse.Namespace, config: Config, logger: logging.Logger,
+) -> int:
+    """Ejecuta el comando get-url."""
+    try:
+        url_manager = config.get_url_manager()
+        url_config = url_manager.load()
+
+        logger.info("=== URL Activa ===")
+        logger.info("URL en uso: %s", config.list_url)
+        logger.info("Fuente: %s", config.url_source)
+
+        if url_config.active_url:
+            logger.info("Override activo: %s", url_config.active_url)
+            logger.info("Override desde: %s", url_config.updated_at)
+        else:
+            logger.info("No hay URL override — se usa la del .env")
+
+        history = url_config.history
+        if history:
+            logger.info("")
+            logger.info("=== Historial de URLs (%d entradas) ===", len(history))
+            for i, entry in enumerate(history, 1):
+                status = "activa" if entry.used_until is None else entry.used_until
+                reason = " (%s)" % entry.reason if entry.reason else ""
+                logger.info(
+                    "  %d. %s | desde %s → %s%s",
+                    i, entry.url, entry.used_from, status, reason,
+                )
+        else:
+            logger.info("Historial vacío — no se han hecho cambios de URL")
+
+        return 0
+
+    except Exception:
+        logger.exception("Error ejecutando get-url")
+        return 1
+
+
+def execute_reset_url(
+    args: argparse.Namespace, config: Config, logger: logging.Logger,
+) -> int:
+    """Ejecuta el comando reset-url."""
+    try:
+        url_manager = config.get_url_manager()
+        url_config = url_manager.load()
+
+        if not url_config.active_url:
+            logger.info("No hay URL override activa, nada que resetear")
+            return 0
+
+        old_url = url_config.active_url
+        url_manager.reset_url(reason=args.reason)
+
+        logger.info("✓ URL override eliminada")
+        logger.info("  URL anterior (override): %s", old_url)
+        logger.info(
+            "  La próxima ejecución de 'download' usará IPTV_LIST_URL del .env."
+        )
+
+        return 0
+
+    except Exception:
+        logger.exception("Error ejecutando reset-url")
+        return 1
+
+
+def main(argv: list[str] | None = None) -> int:
     """
     Función principal de la CLI.
-    
+
     Args:
-        argv: Lista de argumentos (opcional, usa sys.argv si no se proporciona)
-        
+        argv: Lista de argumentos (opcional, usa sys.argv si no se proporciona).
+
     Returns:
-        Código de salida (0 = éxito, 1 = error)
+        Código de salida (0 = éxito, 1 = error).
     """
     parser = create_parser()
     args = parser.parse_args(argv)
-    
+
     # Configurar logging
     log_level = logging.DEBUG if args.verbose else logging.INFO
     log_file = args.log_file if args.log_file else "logs/iptvListWatcher.log"
     logger = setup_logging(log_level, log_file)
-    
+
     # Cargar configuración
     try:
         config = Config.from_env()
-        
+
         # Sobrescribir con argumentos de CLI si se proporcionan
         if args.url:
             config.list_url = args.url
+            config.url_source = "cli"
         if args.host_ip:
             config.host_ip = args.host_ip
         if args.output_dir:
             config.output_dir = args.output_dir
             config.olds_dir = config.output_dir / "olds"
-            
-    except Exception as e:
-        logger.error(f"Error cargando configuración: {e}")
+
+    except Exception as exc:
+        logger.error("Error cargando configuración: %s", exc)
         return 1
-    
+
     # Ejecutar comando correspondiente
     commands = {
         "download": execute_download,
@@ -330,14 +477,17 @@ def main(argv: Optional[list] = None) -> int:
         "clean": execute_clean,
         "info": execute_info,
         "hash": execute_hash,
+        "set-url": execute_set_url,
+        "get-url": execute_get_url,
+        "reset-url": execute_reset_url,
     }
-    
+
     command_func = commands.get(args.command)
     if command_func:
         return command_func(args, config, logger)
-    else:
-        logger.error(f"Comando desconocido: {args.command}")
-        return 1
+
+    logger.error("Comando desconocido: %s", args.command)
+    return 1
 
 
 if __name__ == "__main__":

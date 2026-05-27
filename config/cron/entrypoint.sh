@@ -28,6 +28,8 @@ echo ""
 # Verificar permisos de directorios
 echo "Verificando permisos..."
 chown -R cron-user:cron-user /app/logs 2>/dev/null || true
+chown -R root:root /app/playlist 2>/dev/null || true
+chmod -R u+rwX /app/playlist 2>/dev/null || true
 
 # Verificar que existe el archivo de log de cron (debe ser root ya que cron se ejecuta como root)
 if [ ! -f /var/log/cron/cron.log ]; then
@@ -87,7 +89,6 @@ echo "✓ Crontab registrado"
 
 # Ejecutar iptvListWatcher download al iniciar el contenedor
 echo "Ejecutando iptvListWatcher download inicial..."
-#TODO: ACTIVAR, no va con el cambio del formato de la lista
 cd /app && python -m iptvListWatcher download >> /app/logs/iptvListWatcher.log 2>&1 || true
 
 # Ejecutar iptvListValidator validate al iniciar el contenedor (si existe la lista)

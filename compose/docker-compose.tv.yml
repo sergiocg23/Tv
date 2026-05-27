@@ -1,0 +1,195 @@
+# ============================================================
+# Stack: tv
+# Description: IPTV streaming stack (WARP, AceStream, Jellyfin, Cron automation)
+# Usage: docker compose --env-file .env -f compose/docker-compose.tv.yml up -d
+# Override GPU: docker compose --env-file .env -f compose/docker-compose.tv.yml -f compose/docker-compose.tv.intel-ext.yml up -d
+# ============================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  warp:
+    image: monius/docker-warp-socks:v4 # Usa la v4 porque en la v5 hay un bug
+    container_name: warp-ace
+    expose:
+      - 9091
+    restart: unless-stopped
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 1
+      net.ipv4.conf.all.src_valid_mark: 1
+    environment:
+      - LOG_LEVEL=debug
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    logging: *default-logging
+    networks:
+      - stream_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sS --socks5 127.0.0.1:9091 https://www.cloudflare.com/cdn-cgi/trace | grep -q 'warp=on'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  acestream:
+    image: rotiemex/acewarp:latest
+    container_name: acestream6878
+    volumes:
+      - ../config/acestream/acestream.conf:/opt/acestream/acestream.conf:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+      - SYS_ADMIN
+    ports:
+      - "127.0.0.1:8621:8621" # Estadísticas
+      - "6878:6878" # Ace Stream Engine
+    depends_on:
+      - warp
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - stream_net
+    healthcheck:
+      test: ["CMD", "curl", "-sSf", "http://localhost:8621"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  jellyfin:
+    image: jellyfin/jellyfin:10.10.6
+    container_name: jellyfin
+    entrypoint: ["/bin/bash", "/scripts/entrypoint.sh"]
+    environment:
+      - TZ=Europe/Madrid
+      # - JELLYFIN_PublishedServerUrl=http://192.168.1.138:8096  # Descomentar cuando uses Tailscale y cambiar a tu IP de Tailscale
+    volumes:
+      - ../config/jellyfin/entrypoint.sh:/scripts/entrypoint.sh:ro
+      - ../data/jellyfin/config:/config
+      - ../data/jellyfin/cache:/cache
+      - ../data/jellyfin/media:/media:ro
+      - ../data/playlist:/playlist:ro
+    # devices: Se configura en docker-compose.tv.intel-ext.yml o docker-compose.tv.nvidia-ext.yml
+    ports:
+      - "8096:8096"
+      - "7359:7359/udp"
+    depends_on:
+      acestream:
+        condition: service_started
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - tv_net
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8096/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  autoheal:
+    container_name: autoheal
+    image: willfarrell/autoheal:latest
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    networks:
+      - tv_net
+    logging: *default-logging
+
+  cron:
+    build:
+      context: ..
+      dockerfile: config/cron/Dockerfile
+    container_name: cron
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      - TZ=Europe/Madrid
+      - PYTHONUNBUFFERED=1
+      # Variables iptvListWatcher
+      - HOST_IP=${HOST_IP}
+      - IPTV_LIST_URL=${IPTV_LIST_URL}
+      - IPTV_OUTPUT_DIR=${IPTV_OUTPUT_DIR}
+      - IPTV_FILENAME=${IPTV_FILENAME}
+      - IPTV_GENERIC_IP=${IPTV_GENERIC_IP}
+      - IPTV_DOWNLOAD_TIMEOUT=${IPTV_DOWNLOAD_TIMEOUT}
+      # Variables iptvListValidator
+      - VALIDATOR_OUTPUT_DIR=${VALIDATOR_OUTPUT_DIR}
+      - VALIDATOR_TIMEOUT_CONNECT=${VALIDATOR_TIMEOUT_CONNECT}
+      - VALIDATOR_TIMEOUT_STREAM=${VALIDATOR_TIMEOUT_STREAM}
+      - VALIDATOR_STABILITY_TEST_DURATION=${VALIDATOR_STABILITY_TEST_DURATION}
+      - VALIDATOR_MIN_BITRATE=${VALIDATOR_MIN_BITRATE}
+      - VALIDATOR_ANALYSIS_METHOD=${VALIDATOR_ANALYSIS_METHOD:-auto}
+      - VALIDATOR_FFMPEG_DURATION=${VALIDATOR_FFMPEG_DURATION:-10}
+      - VALIDATOR_FFMPEG_TIMEOUT=${VALIDATOR_FFMPEG_TIMEOUT:-30}
+      - VALIDATOR_HYBRID_ANALYSIS=${VALIDATOR_HYBRID_ANALYSIS:-true}
+      - VALIDATOR_MAX_RETRIES=${VALIDATOR_MAX_RETRIES:-3}
+      - VALIDATOR_RETRY_DELAY=${VALIDATOR_RETRY_DELAY:-5}
+      - VALIDATOR_CONFIDENCE_FILE=${VALIDATOR_CONFIDENCE_FILE:-confidence.json}
+    volumes:
+      - ../data/playlist:/app/playlist
+      - ../data/logs:/app/logs
+      - ../config/cron/crontab:/etc/cron.d/tv-automation:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+    tmpfs:
+      - /tmp
+    networks:
+      - stream_net
+    logging: *default-logging
+    depends_on:
+      warp:
+        condition: service_healthy
+      acestream:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/cron-health.sh"]
+      interval: 60s
+      timeout: 20s
+      retries: 3
+      start_period: 60s
+
+networks:
+  stream_net:
+    name: stream_net
+    driver: bridge
+
+  tv_net:
+    name: tv_net
+    driver: bridge
+
+  default:
+    name: tv_net

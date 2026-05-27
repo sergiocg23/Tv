@@ -1,0 +1,162 @@
+# ============================================================
+# DEPRECATED — Old version nginx + acestream + warp + jellyfin setup
+# Las rutas de volúmenes NO están actualizadas a la nueva estructura.
+# Se conserva solo como referencia histórica.
+# ============================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  warp:
+    image: monius/docker-warp-socks:v5
+    container_name: warp-ace
+    expose:
+      - 9091
+    restart: unless-stopped
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 1
+      net.ipv4.conf.all.src_valid_mark: 1
+    environment:
+      - LOG_LEVEL=debug
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    logging: *default-logging
+    networks:
+      - stream_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sS --socks5 127.0.0.1:9091 https://www.cloudflare.com/cdn-cgi/trace | grep -q 'warp=on'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  acestream:
+    image: rotiemex/acewarp:latest
+    container_name: acestream6878
+    volumes:
+      - ./config/acestream.conf:/opt/acestream/acestream.conf
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+      - SYS_ADMIN
+    ports:
+      - "8621:8621"
+      - "6878:6878"
+      - "6879:6879"
+    depends_on:
+      - warp
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - stream_net
+    healthcheck:
+      test: ["CMD", "curl", "-sSf", "http://localhost:8621"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    build: ./config/nginx
+    image: nginx-playlist:latest
+    container_name: nginx-playlist
+    volumes:
+      - ./playlist:/usr/share/nginx/html:ro
+      - nginx-certs:/tmp/certs
+      # - ./config/nginx/certs:/tmp/certs:rw
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/cache/nginx/client_temp
+      - /var/run
+      - /var/log/nginx
+      - /tmp
+    ports:
+      - "8080:443"
+      - "8081:80"
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETGID
+      - SETUID
+      - CHOWN
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+    networks:
+      - tv_net
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/nginx-health.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    entrypoint: ["/docker-custom-entrypoint.sh"]
+
+  jellyfin:
+    image: jellyfin/jellyfin:10.10.6
+    container_name: jellyfin
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+    volumes:
+      - ./jellyfin/config:/config
+      - ./jellyfin/cache:/cache
+      - ./jellyfin/media:/media
+      # - nginx-certs:/certs:ro
+      - ./playlist:/playlist:ro
+    ports:
+      - "8096:8096"
+    depends_on:
+      - nginx
+    restart: unless-stopped
+    logging: *default-logging
+    networks:
+      - tv_net
+
+  autoheal:
+    container_name: autoheal
+    image: willfarrell/autoheal:latest
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    networks:
+      - tv_net
+    logging: *default-logging
+
+volumes:
+  nginx-certs:
+    name: nginx-certs 
+
+networks:
+  stream_net:
+    name: stream_net
+    driver: bridge
+
+  tv_net:
+    name: tv_net
+    driver: bridge
+
+  default:
+    name: tv_net
